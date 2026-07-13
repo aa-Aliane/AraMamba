@@ -1,0 +1,32 @@
+{
+  "languages": {
+    "Python": {
+      "format_on_save": "on",
+      "formatter": [
+        {
+          "external": {
+            "command": "/home/drdhn/anaconda3/envs/id_env/bin/isort",
+            "arguments": ["-"]
+          }
+        },
+        {
+          "external": {
+            "command": "/home/drdhn/anaconda3/envs/id_env/bin/black",
+            "arguments": ["-"]
+          }
+        }
+      ]
+    }
+  },
+  "lsp": {
+      "ty": {
+        "settings": {
+          "configuration": {
+            "environment": {
+              "root": "/home/drdhn/anaconda3/envs/id_env"
+            }
+          }
+        }
+      }
+    }
+}
