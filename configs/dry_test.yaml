@@ -1,0 +1,39 @@
+model:
+  d_model: 128
+  n_layer: 2
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  pad_token_id: 0
+  gradient_checkpointing: false
+
+training:
+  batch_size: 2
+  grad_accum_steps: 1
+  lr: 3.0e-4
+  weight_decay: 0.01
+  warmup_steps: 5
+  max_steps: 20
+  mlm_probability: 0.15
+  fp16: true
+  seed: 42
+  save_steps: 10
+  log_steps: 1
+  num_workers: 2
+
+distributed:
+  num_gpus: 1
+
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  train_dir: "outputs/data/train"
+  val_dir: "outputs/data/val"
+  max_seq_length: 512
+
+paths:
+  output_dir: "outputs"
+  checkpoint_dir: "checkpoint"
+  logs_dir: "logs"
+  results_dir: "results"

@@ -1,0 +1,40 @@
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  pad_token_id: 0
+  gradient_checkpointing: true   # Keep this on to test real VRAM limits
+
+training:
+  batch_size: 8                # This is what we will stress-test
+  grad_accum_steps: 8
+  lr: 5.0e-4                    # Slightly aggressive for pilot tests
+  weight_decay: 0.01
+  warmup_steps: 200             # Short warmup for quick diagnostic
+  max_steps: 2000               # We only need 1,000 - 2,000 steps to check trajectory
+  mlm_probability: 0.15
+  fp16: true
+  seed: 42
+  save_steps: 500
+  log_steps: 10
+  num_workers: 4
+
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  train_dir: "outputs/data/train"  # Pointing to your 500MB dry-run directory
+  val_dir: "outputs/data/val"
+  max_seq_length: 512
+
+paths:
+  output_dir: "outputs_pilot"
+  checkpoint_dir: "checkpoint_pilot"
+  logs_dir: "logs_pilot"
+  results_dir: "results_pilot"
+
+distributed:
+  num_gpus: 4
+  backend: "nccl"
