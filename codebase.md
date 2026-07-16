@@ -12,7 +12,13 @@
     │   ├── __pycache__
     │   │   └── mamba.cpython-311.pyc
     │   └── mamba.py
-    └── train.py
+    ├── train.py
+    └── utils
+        ├── __init__.py
+        ├── __pycache__
+        │   ├── __init__.cpython-311.pyc
+        │   └── eval.cpython-311.pyc
+        └── eval.py
 
 ```
 
@@ -33,9 +39,9 @@ model:
   gradient_checkpointing: true   # required to fit on 11GB cards
 
 training:
-  batch_size: 16                # per-GPU; effective = 16*4 gpus*grad_accum
-  grad_accum_steps: 4
-  lr: 3e-4
+  batch_size: 8
+  grad_accum_steps: 8
+  lr: 3.0e-4
   weight_decay: 0.01
   warmup_steps: 10000
   max_steps: 200000
@@ -126,8 +132,8 @@ model:
   gradient_checkpointing: true   # Keep this on to test real VRAM limits
 
 training:
-  batch_size: 16               # This is what we will stress-test
-  grad_accum_steps: 2
+  batch_size: 8              # This is what we will stress-test
+  grad_accum_steps: 8
   lr: 5.0e-4                    # Slightly aggressive for pilot tests
   weight_decay: 0.01
   warmup_steps: 200             # Short warmup for quick diagnostic
@@ -331,6 +337,13 @@ def stream_source(name, config, text_field="text"):
         yield ex[text_field]
 
 
+def bounded(raw_iter, writer, budget_bytes):
+    for item in raw_iter:
+        if writer.total_bytes >= budget_bytes:
+            return
+        yield item
+
+
 def process_stream(
     raw_iter,
     train_writer,
@@ -397,7 +410,11 @@ def main(args):
     with Pool(processes=args.workers) as pool:
         print("== Arabic Wikipedia ==")
         process_stream(
-            stream_source("wikimedia/wikipedia", "20231101.ar"),
+            bounded(
+                stream_source("wikimedia/wikipedia", "20231101.ar"),
+                train_writer,
+                budget_bytes,
+            ),
             train_writer,
             val_writer,
             bloom,
@@ -411,7 +428,9 @@ def main(args):
                 "== CulturaX (ar) == (needs HF terms accepted + `huggingface-cli login`)"
             )
             process_stream(
-                stream_source("uonlp/CulturaX", "ar"),
+                bounded(
+                    stream_source("uonlp/CulturaX", "ar"), train_writer, budget_bytes
+                ),
                 train_writer,
                 val_writer,
                 bloom,
@@ -570,7 +589,6 @@ class MambaEncoder(nn.Module):
         self.word_emb = nn.Embedding(
             config["vocab_size"], d_model, padding_idx=config.get("pad_token_id", 0)
         )
-        self.pos_emb = nn.Embedding(config["max_position_embeddings"], d_model)
         self.emb_dropout = nn.Dropout(config.get("dropout", 0.1))
         self.layers = nn.ModuleList(
             [
@@ -589,8 +607,7 @@ class MambaEncoder(nn.Module):
 
     def forward(self, input_ids, attention_mask=None):
         B, L = input_ids.shape
-        positions = torch.arange(L, device=input_ids.device).unsqueeze(0).expand(B, L)
-        x = self.word_emb(input_ids) + self.pos_emb(positions)
+        x = self.word_emb(input_ids)
         x = self.emb_dropout(x)
         if attention_mask is not None:
             x = x * attention_mask.unsqueeze(-1)
@@ -677,6 +694,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 
 from models.mamba import MambaForMaskedLM
+from utils.eval import evaluate
 
 
 class ShardedTextDataset(Dataset):
@@ -781,6 +799,25 @@ def main(cfg_path):
         train_ds,
         batch_size=tcfg["batch_size"],
         sampler=sampler,
+        num_workers=tcfg["num_workers"],
+        collate_fn=lambda b: collate_mlm(
+            b,
+            tokenizer.pad_token_id,
+            tokenizer.mask_token_id,
+            tokenizer.vocab_size,
+            tcfg["mlm_probability"],
+        ),
+    )
+
+    # Val set: only rank 0 evaluates (no_grad forward, no backward/allreduce
+    # needed), so no DistributedSampler required here.
+    val_ds = ShardedTextDataset(
+        cfg["data"]["val_dir"], tokenizer, cfg["data"]["max_seq_length"]
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=tcfg["batch_size"],
+        shuffle=False,
         num_workers=tcfg["num_workers"],
         collate_fn=lambda b: collate_mlm(
             b,
@@ -918,6 +955,13 @@ def main(cfg_path):
                     torch.cuda.reset_peak_memory_stats(device)
 
                 if is_main and opt_step % tcfg["save_steps"] == 0 and opt_step > 0:
+                    metrics = evaluate(model, val_loader, device, tcfg["fp16"])
+                    print(
+                        f"[opt_step {opt_step}] val_loss={metrics['loss']:.4f} "
+                        f"val_acc={metrics['accuracy']:.4f} "
+                        f"val_ppl={metrics['perplexity']:.2f}"
+                    )
+
                     ckpt = {
                         "step": opt_step,
                         "model": model.module.state_dict(),
@@ -943,6 +987,68 @@ if __name__ == "__main__":
     p.add_argument("--config", default="configs/base.yaml")
     args = p.parse_args()
     main(args.config)
+
+```
+
+
+## src/utils/eval.py
+
+```py
+"""
+Held-out evaluation for MLM pretraining: val loss, masked-token accuracy,
+and perplexity. Kept separate from train.py so the eval logic can be run,
+tested, or extended (e.g. later a downstream probe) independently of the
+training loop.
+"""
+
+import math
+
+import torch
+
+
+@torch.no_grad()
+def evaluate(model, val_loader, device, fp16):
+    """Runs a full pass over val_loader and returns a dict of metrics:
+      - loss: mean MLM cross-entropy loss over all masked positions
+      - accuracy: top-1 accuracy of predictions at masked positions only
+      - perplexity: exp(loss), the standard MLM perplexity metric
+
+    Only meant to be called on the main rank (rank 0); this is a no_grad
+    forward pass with no backward/allreduce, so DDP doesn't need every
+    rank to participate.
+    """
+    model.eval()
+    total_loss, n_batches = 0.0, 0
+    correct, total_masked = 0, 0
+
+    for input_ids, attn_mask, labels in val_loader:
+        input_ids, attn_mask, labels = (
+            input_ids.to(device),
+            attn_mask.to(device),
+            labels.to(device),
+        )
+        with torch.amp.autocast(device_type="cuda", enabled=fp16):
+            out = model(input_ids, attn_mask, labels)
+
+        total_loss += out["loss"].item()
+        n_batches += 1
+
+        masked_positions = labels != -100
+        if masked_positions.any():
+            preds = out["logits"].argmax(dim=-1)
+            correct += (
+                (preds[masked_positions] == labels[masked_positions]).sum().item()
+            )
+            total_masked += masked_positions.sum().item()
+
+    model.train()
+
+    mean_loss = total_loss / max(1, n_batches)
+    accuracy = correct / max(1, total_masked)
+    # guard against overflow on a badly-diverged run
+    perplexity = math.exp(mean_loss) if mean_loss < 20 else float("inf")
+
+    return {"loss": mean_loss, "accuracy": accuracy, "perplexity": perplexity}
 
 ```
 

@@ -11,7 +11,7 @@ import torch
 
 
 @torch.no_grad()
-def evaluate(model, val_loader, device, fp16):
+def evaluate(model, val_loader, device, fp16, max_batches=None):
     """Runs a full pass over val_loader and returns a dict of metrics:
       - loss: mean MLM cross-entropy loss over all masked positions
       - accuracy: top-1 accuracy of predictions at masked positions only
@@ -25,7 +25,9 @@ def evaluate(model, val_loader, device, fp16):
     total_loss, n_batches = 0.0, 0
     correct, total_masked = 0, 0
 
-    for input_ids, attn_mask, labels in val_loader:
+    for i, (input_ids, attn_mask, labels) in enumerate(val_loader):
+        if max_batches is not None and i >= max_batches:
+            break
         input_ids, attn_mask, labels = (
             input_ids.to(device),
             attn_mask.to(device),

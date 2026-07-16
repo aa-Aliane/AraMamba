@@ -101,7 +101,7 @@ def collate_mlm(batch, pad_id, mask_id, vocab_size, mlm_prob):
 
 
 def setup_ddp():
-    dist.init_process_group(backend="nccl")
+    dist.init_process_group(backend="nccl", timeout=datetime.timedelta(minutes=30))
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
     return local_rank
@@ -285,25 +285,29 @@ def main(cfg_path):
                     )
                     torch.cuda.reset_peak_memory_stats(device)
 
-                if is_main and opt_step % tcfg["save_steps"] == 0 and opt_step > 0:
-                    metrics = evaluate(model, val_loader, device, tcfg["fp16"])
-                    print(
-                        f"[opt_step {opt_step}] val_loss={metrics['loss']:.4f} "
-                        f"val_acc={metrics['accuracy']:.4f} "
-                        f"val_ppl={metrics['perplexity']:.2f}"
+                if opt_step % tcfg["save_steps"] == 0 and opt_step > 0:
+                    metrics = evaluate(
+                        model, val_loader, device, tcfg["fp16"], max_batches=300
                     )
+                    if is_main:
+                        print(
+                            f"[opt_step {opt_step}] val_loss={metrics['loss']:.4f} "
+                            f"val_acc={metrics['accuracy']:.4f} "
+                            f"val_ppl={metrics['perplexity']:.2f}"
+                        )
 
-                    ckpt = {
-                        "step": opt_step,
-                        "model": model.module.state_dict(),
-                        "optim": optim.state_dict(),
-                        "scaler": scaler.state_dict(),
-                        "scheduler": scheduler.state_dict(),
-                    }
-                    ckpt_path = f"{cfg['paths']['checkpoint_dir']}/step_{opt_step}.pt"
-                    torch.save(ckpt, ckpt_path)
-                    # also a fixed-name "latest" pointer so resume doesn't need to scan filenames
-                    torch.save(ckpt, f"{cfg['paths']['checkpoint_dir']}/latest.pt")
+                        ckpt = {
+                            "step": opt_step,
+                            "model": model.module.state_dict(),
+                            "optim": optim.state_dict(),
+                            "scaler": scaler.state_dict(),
+                            "scheduler": scheduler.state_dict(),
+                        }
+                        ckpt_path = (
+                            f"{cfg['paths']['checkpoint_dir']}/step_{opt_step}.pt"
+                        )
+                        torch.save(ckpt, ckpt_path)
+                        torch.save(ckpt, f"{cfg['paths']['checkpoint_dir']}/latest.pt")
                 step_start_time = time.time()
             step += 1
             data_start_time = time.time()
