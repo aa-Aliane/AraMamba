@@ -4,6 +4,7 @@
 ├── configs
 │   ├── base.yaml
 │   ├── dry_test.yaml
+│   ├── eval_check.yaml
 │   └── pilot.yaml
 └── src
     ├── data
@@ -113,6 +114,53 @@ paths:
   checkpoint_dir: "checkpoint"
   logs_dir: "logs"
   results_dir: "results"
+
+```
+
+
+## configs/eval_check.yaml
+
+```yaml
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  pad_token_id: 0
+  gradient_checkpointing: true   # same as base: required to fit on 11GB cards
+
+training:
+  batch_size: 8                 # same as base: real VRAM/throughput behavior
+  grad_accum_steps: 8
+  lr: 3.0e-4
+  weight_decay: 0.01
+  warmup_steps: 10000
+  max_steps: 60                 # just enough to cross save_steps a couple times
+  mlm_probability: 0.15
+  fp16: true
+  seed: 42
+  save_steps: 10                # hits the eval/checkpoint branch at step 10, 20, 30
+  log_steps: 1
+  num_workers: 8
+
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  train_dir: "outputs/data/train"   # point at a real (even if small) shard dir
+  val_dir: "outputs/data/val"
+  max_seq_length: 512
+
+paths:
+  output_dir: "outputs_eval_check"
+  checkpoint_dir: "checkpoint_eval_check"
+  logs_dir: "logs_eval_check"
+  results_dir: "results_eval_check"
+
+distributed:
+  num_gpus: 4
+  backend: "nccl"
 
 ```
 
@@ -770,7 +818,7 @@ def collate_mlm(batch, pad_id, mask_id, vocab_size, mlm_prob):
 
 
 def setup_ddp():
-    dist.init_process_group(backend="nccl")
+    dist.init_process_group(backend="nccl", timeout=datetime.timedelta(minutes=30))
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
     return local_rank
@@ -954,25 +1002,29 @@ def main(cfg_path):
                     )
                     torch.cuda.reset_peak_memory_stats(device)
 
-                if is_main and opt_step % tcfg["save_steps"] == 0 and opt_step > 0:
-                    metrics = evaluate(model, val_loader, device, tcfg["fp16"])
-                    print(
-                        f"[opt_step {opt_step}] val_loss={metrics['loss']:.4f} "
-                        f"val_acc={metrics['accuracy']:.4f} "
-                        f"val_ppl={metrics['perplexity']:.2f}"
+                if opt_step % tcfg["save_steps"] == 0 and opt_step > 0:
+                    metrics = evaluate(
+                        model, val_loader, device, tcfg["fp16"], max_batches=300
                     )
+                    if is_main:
+                        print(
+                            f"[opt_step {opt_step}] val_loss={metrics['loss']:.4f} "
+                            f"val_acc={metrics['accuracy']:.4f} "
+                            f"val_ppl={metrics['perplexity']:.2f}"
+                        )
 
-                    ckpt = {
-                        "step": opt_step,
-                        "model": model.module.state_dict(),
-                        "optim": optim.state_dict(),
-                        "scaler": scaler.state_dict(),
-                        "scheduler": scheduler.state_dict(),
-                    }
-                    ckpt_path = f"{cfg['paths']['checkpoint_dir']}/step_{opt_step}.pt"
-                    torch.save(ckpt, ckpt_path)
-                    # also a fixed-name "latest" pointer so resume doesn't need to scan filenames
-                    torch.save(ckpt, f"{cfg['paths']['checkpoint_dir']}/latest.pt")
+                        ckpt = {
+                            "step": opt_step,
+                            "model": model.module.state_dict(),
+                            "optim": optim.state_dict(),
+                            "scaler": scaler.state_dict(),
+                            "scheduler": scheduler.state_dict(),
+                        }
+                        ckpt_path = (
+                            f"{cfg['paths']['checkpoint_dir']}/step_{opt_step}.pt"
+                        )
+                        torch.save(ckpt, ckpt_path)
+                        torch.save(ckpt, f"{cfg['paths']['checkpoint_dir']}/latest.pt")
                 step_start_time = time.time()
             step += 1
             data_start_time = time.time()
@@ -1007,7 +1059,7 @@ import torch
 
 
 @torch.no_grad()
-def evaluate(model, val_loader, device, fp16):
+def evaluate(model, val_loader, device, fp16, max_batches=None):
     """Runs a full pass over val_loader and returns a dict of metrics:
       - loss: mean MLM cross-entropy loss over all masked positions
       - accuracy: top-1 accuracy of predictions at masked positions only
@@ -1021,7 +1073,9 @@ def evaluate(model, val_loader, device, fp16):
     total_loss, n_batches = 0.0, 0
     correct, total_masked = 0, 0
 
-    for input_ids, attn_mask, labels in val_loader:
+    for i, (input_ids, attn_mask, labels) in enumerate(val_loader):
+        if max_batches is not None and i >= max_batches:
+            break
         input_ids, attn_mask, labels = (
             input_ids.to(device),
             attn_mask.to(device),
