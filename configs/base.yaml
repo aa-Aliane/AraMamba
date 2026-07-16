@@ -10,9 +10,9 @@ model:
   gradient_checkpointing: true   # required to fit on 11GB cards
 
 training:
-  batch_size: 16                # per-GPU; effective = 16*4 gpus*grad_accum
-  grad_accum_steps: 4
-  lr: 3e-4
+  batch_size: 8
+  grad_accum_steps: 8
+  lr: 3.0e-4
   weight_decay: 0.01
   warmup_steps: 10000
   max_steps: 200000

@@ -110,7 +110,6 @@ class MambaEncoder(nn.Module):
         self.word_emb = nn.Embedding(
             config["vocab_size"], d_model, padding_idx=config.get("pad_token_id", 0)
         )
-        self.pos_emb = nn.Embedding(config["max_position_embeddings"], d_model)
         self.emb_dropout = nn.Dropout(config.get("dropout", 0.1))
         self.layers = nn.ModuleList(
             [
@@ -129,8 +128,7 @@ class MambaEncoder(nn.Module):
 
     def forward(self, input_ids, attention_mask=None):
         B, L = input_ids.shape
-        positions = torch.arange(L, device=input_ids.device).unsqueeze(0).expand(B, L)
-        x = self.word_emb(input_ids) + self.pos_emb(positions)
+        x = self.word_emb(input_ids)
         x = self.emb_dropout(x)
         if attention_mask is not None:
             x = x * attention_mask.unsqueeze(-1)

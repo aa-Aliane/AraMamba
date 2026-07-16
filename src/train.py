@@ -25,6 +25,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 
 from models.mamba import MambaForMaskedLM
+from utils.eval import evaluate
 
 
 class ShardedTextDataset(Dataset):
@@ -129,6 +130,25 @@ def main(cfg_path):
         train_ds,
         batch_size=tcfg["batch_size"],
         sampler=sampler,
+        num_workers=tcfg["num_workers"],
+        collate_fn=lambda b: collate_mlm(
+            b,
+            tokenizer.pad_token_id,
+            tokenizer.mask_token_id,
+            tokenizer.vocab_size,
+            tcfg["mlm_probability"],
+        ),
+    )
+
+    # Val set: only rank 0 evaluates (no_grad forward, no backward/allreduce
+    # needed), so no DistributedSampler required here.
+    val_ds = ShardedTextDataset(
+        cfg["data"]["val_dir"], tokenizer, cfg["data"]["max_seq_length"]
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=tcfg["batch_size"],
+        shuffle=False,
         num_workers=tcfg["num_workers"],
         collate_fn=lambda b: collate_mlm(
             b,
@@ -266,6 +286,13 @@ def main(cfg_path):
                     torch.cuda.reset_peak_memory_stats(device)
 
                 if is_main and opt_step % tcfg["save_steps"] == 0 and opt_step > 0:
+                    metrics = evaluate(model, val_loader, device, tcfg["fp16"])
+                    print(
+                        f"[opt_step {opt_step}] val_loss={metrics['loss']:.4f} "
+                        f"val_acc={metrics['accuracy']:.4f} "
+                        f"val_ppl={metrics['perplexity']:.2f}"
+                    )
+
                     ckpt = {
                         "step": opt_step,
                         "model": model.module.state_dict(),

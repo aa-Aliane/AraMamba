@@ -4,7 +4,7 @@
 ├── configs
 │   ├── base.yaml
 │   ├── dry_test.yaml
-│   └── pilote.yaml
+│   └── pilot.yaml
 └── src
     ├── data
     │   └── prepare_data.py
@@ -111,7 +111,7 @@ paths:
 ```
 
 
-## configs/pilote.yaml
+## configs/pilot.yaml
 
 ```yaml
 model:
@@ -126,8 +126,8 @@ model:
   gradient_checkpointing: true   # Keep this on to test real VRAM limits
 
 training:
-  batch_size: 16                # This is what we will stress-test
-  grad_accum_steps: 4
+  batch_size: 16               # This is what we will stress-test
+  grad_accum_steps: 2
   lr: 5.0e-4                    # Slightly aggressive for pilot tests
   weight_decay: 0.01
   warmup_steps: 200             # Short warmup for quick diagnostic
@@ -178,7 +178,18 @@ CulturaX one-time setup (required before running this script):
 This script:
   - cleans docs in parallel across CPU cores (regex cleaning, language
     ratio filter, min-length filter)
-  - exact-dedups via a bounded-memory Bloom filter (no extra dependency)
+  - CHUNKS each cleaned document into ~max_chunk_words-sized pieces before
+    writing. Without this, one line == one whole document, and Wikipedia
+    articles / CulturaX web pages routinely run to 500-2000+ words. Since
+    the training-side tokenizer truncates each line to max_seq_length
+    tokens, un-chunked long documents (a) blow past the model's sequence
+    length so almost every batch is padded/truncated to the max -> much
+    higher, less predictable GPU memory use, and (b) silently throw away
+    everything past the first ~512 tokens of any long document, wasting
+    most of the cleaned/deduped text you paid to collect.
+  - exact-dedups via a bounded-memory Bloom filter (no extra dependency),
+    applied per-chunk so repeated boilerplate chunks across documents are
+    still caught
   - writes to sharded files (<out_dir>/train/shard_00000.txt, ...) instead
     of one giant file, so downstream code never has to load the full
     corpus into RAM
@@ -189,6 +200,7 @@ Usage:
 """
 
 import argparse
+import functools
 import hashlib
 import math
 import os
@@ -207,6 +219,15 @@ MIN_WORDS = 20
 MIN_ARABIC_RATIO = 0.7
 SHARD_BYTES = 1 * 1024**3  # ~1GB per shard file
 
+# Word-based chunk size, not token-based: this script has no tokenizer
+# dependency, so we approximate. Arabic subword tokenizers (e.g. the
+# AraBERT vocab used downstream) commonly run close to ~1 token/word to
+# ~1.3 tokens/word depending on register, so 400 words keeps most chunks
+# comfortably under a 512-token max_seq_length after the tokenizer adds
+# [CLS]/[SEP] and does its own subword splitting. Adjust if your
+# tokenizer's token/word ratio differs meaningfully.
+MAX_CHUNK_WORDS = 400
+
 
 def clean_doc(text):
     if not text:
@@ -221,6 +242,31 @@ def clean_doc(text):
     if len(ARABIC_CHAR.findall(text)) / max(1, len(text)) < MIN_ARABIC_RATIO:
         return None
     return text
+
+
+def chunk_doc(text, max_words=MAX_CHUNK_WORDS):
+    """Split a cleaned document into ~max_words-sized chunks so no single
+    training line silently exceeds the model's max_seq_length. Splits on
+    whitespace-delimited words (cheap, no tokenizer dependency here); the
+    last partial chunk is kept only if it still meets MIN_WORDS."""
+    words = text.split()
+    if len(words) <= max_words:
+        yield text
+        return
+    for i in range(0, len(words), max_words):
+        chunk_words = words[i : i + max_words]
+        if len(chunk_words) < MIN_WORDS:
+            continue
+        yield " ".join(chunk_words)
+
+
+def clean_and_chunk(text, max_chunk_words=MAX_CHUNK_WORDS):
+    """Combines clean_doc + chunk_doc into one function so it can be
+    passed to Pool.imap_unordered as a single per-item worker call."""
+    cleaned = clean_doc(text)
+    if cleaned is None:
+        return []
+    return list(chunk_doc(cleaned, max_words=max_chunk_words))
 
 
 class BloomFilter:
@@ -286,9 +332,16 @@ def stream_source(name, config, text_field="text"):
 
 
 def process_stream(
-    raw_iter, train_writer, val_writer, bloom, pool, budget_bytes, val_every=200
+    raw_iter,
+    train_writer,
+    val_writer,
+    bloom,
+    pool,
+    budget_bytes,
+    worker_fn,
+    val_every=200,
 ):
-    n_kept, n_seen = 0, 0
+    n_kept, n_seen, n_docs = 0, 0, 0
 
     pbar = tqdm(
         total=budget_bytes,
@@ -301,30 +354,33 @@ def process_stream(
     pbar.update(train_writer.total_bytes)
     last_bytes = train_writer.total_bytes
 
-    for cleaned in pool.imap_unordered(clean_doc, raw_iter, chunksize=256):
-        n_seen += 1
-        if cleaned is None:
-            continue
-        if bloom.add_check(cleaned):
-            continue
-        n_kept += 1
-        (val_writer if n_kept % val_every == 0 else train_writer).write(cleaned)
+    for chunks in pool.imap_unordered(worker_fn, raw_iter, chunksize=256):
+        n_docs += 1
+        for cleaned in chunks:
+            n_seen += 1
+            if bloom.add_check(cleaned):
+                continue
+            n_kept += 1
+            (val_writer if n_kept % val_every == 0 else train_writer).write(cleaned)
 
-        current_bytes = train_writer.total_bytes
-        bytes_added = current_bytes - last_bytes
-        if bytes_added > 0:
-            pbar.update(bytes_added)
-            last_bytes = current_bytes
+            current_bytes = train_writer.total_bytes
+            bytes_added = current_bytes - last_bytes
+            if bytes_added > 0:
+                pbar.update(bytes_added)
+                last_bytes = current_bytes
 
-        if n_seen % 1000 == 0:
-            keep_ratio = (n_kept / n_seen) * 100
-            pbar.set_postfix(
-                {
-                    "kept": f"{n_kept:,}",
-                    "seen": f"{n_seen:,}",
-                    "pass_rate": f"{keep_ratio:.1f}%",
-                }
-            )
+            if n_seen % 1000 == 0:
+                keep_ratio = (n_kept / n_seen) * 100
+                pbar.set_postfix(
+                    {
+                        "kept": f"{n_kept:,}",
+                        "seen_chunks": f"{n_seen:,}",
+                        "docs": f"{n_docs:,}",
+                        "pass_rate": f"{keep_ratio:.1f}%",
+                    }
+                )
+            if train_writer.total_bytes >= budget_bytes:
+                break
         if train_writer.total_bytes >= budget_bytes:
             break
     pbar.close()
@@ -336,6 +392,7 @@ def main(args):
     train_writer = ShardWriter(os.path.join(args.out_dir, "train"), "shard")
     val_writer = ShardWriter(os.path.join(args.out_dir, "val"), "shard")
     budget_bytes = int(args.target_size_gb * 1024**3)
+    worker_fn = functools.partial(clean_and_chunk, max_chunk_words=args.max_chunk_words)
 
     with Pool(processes=args.workers) as pool:
         print("== Arabic Wikipedia ==")
@@ -346,6 +403,7 @@ def main(args):
             bloom,
             pool,
             budget_bytes,
+            worker_fn,
         )
 
         if train_writer.total_bytes < budget_bytes:
@@ -359,6 +417,7 @@ def main(args):
                 bloom,
                 pool,
                 budget_bytes,
+                worker_fn,
             )
 
     train_writer.close()
@@ -385,6 +444,12 @@ if __name__ == "__main__":
         help="expected max number of unique docs, sizes the Bloom filter",
     )
     p.add_argument("--workers", type=int, default=64)
+    p.add_argument(
+        "--max_chunk_words",
+        type=int,
+        default=MAX_CHUNK_WORDS,
+        help="split documents into chunks of at most this many words before writing",
+    )
     main(p.parse_args())
 
 ```
@@ -549,6 +614,25 @@ class MambaForMaskedLM(nn.Module):
         )
         self.decoder = nn.Linear(d_model, config["vocab_size"], bias=True)
         self.decoder.weight = self.encoder.word_emb.weight  # weight tying
+        self.apply(self._init_weights)
+
+    @staticmethod
+    def _init_weights(module):
+        """BERT-style init: small-std normal for Linear/Embedding weights,
+        zeroed biases, zeroed padding row. Left at PyTorch defaults (std=1
+        for nn.Embedding) this model starts with wildly overconfident,
+        miscalibrated logits over the 64k vocab, producing a much higher
+        initial MLM loss than the ~ln(vocab_size) expected from random
+        guessing, and unstable early training."""
+        if isinstance(module, nn.Linear):
+            nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.padding_idx is not None:
+                with torch.no_grad():
+                    module.weight[module.padding_idx].fill_(0)
 
     def forward(self, input_ids, attention_mask=None, labels=None):
         hidden = self.encoder(input_ids, attention_mask)
@@ -778,9 +862,10 @@ def main(cfg_path):
                 attn_mask.to(device),
                 labels.to(device),
             )
-        with torch.amp.autocast(device_type="cuda", enabled=tcfg["fp16"]):
-            out = model(input_ids, attn_mask, labels)
-            loss = out["loss"] / tcfg["grad_accum_steps"]
+
+            with torch.amp.autocast(device_type="cuda", enabled=tcfg["fp16"]):
+                out = model(input_ids, attn_mask, labels)
+                loss = out["loss"] / tcfg["grad_accum_steps"]
             scaler.scale(loss).backward()
             if (step + 1) % tcfg["grad_accum_steps"] == 0:
                 scaler.unscale_(optim)
@@ -850,8 +935,7 @@ def main(cfg_path):
             if opt_step >= total_steps:
                 break
 
-
-dist.destroy_process_group()
+    dist.destroy_process_group()
 
 
 if __name__ == "__main__":
