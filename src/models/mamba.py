@@ -100,6 +100,9 @@ class BiMambaBlock(nn.Module):
         merged = self.merge(torch.cat([fwd, bwd], dim=-1))
         x = residual + self.dropout(merged)
         x = x + self.dropout(self.ffn(self.ffn_norm(x)))
+
+        if attention_mask is not None:
+            x = x * attention_mask.unsqueeze(-1)
         return x
 
 
