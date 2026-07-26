@@ -1,0 +1,31 @@
+task:
+  name: "xnli_ar"
+
+pretrained_ckpt: "checkpoint/latest.pt"
+
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  gradient_checkpointing: false
+
+training:
+  batch_size: 16
+  eval_batch_size: 32
+  lr: 2.0e-5
+  weight_decay: 0.01
+  epochs: 3            # XNLI train split is large (~390k), 3 epochs is plenty
+  fp16: true
+  seed: 42
+  num_workers: 4
+
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  max_seq_length: 128   # premise+hypothesis pairs are short
+
+paths:
+  output_dir: "results_finetune/xnli_ar"

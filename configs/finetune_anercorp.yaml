@@ -1,0 +1,32 @@
+task:
+  name: "anercorp"
+
+pretrained_ckpt: "checkpoint/latest.pt"
+
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  gradient_checkpointing: false
+
+training:
+  batch_size: 16
+  eval_batch_size: 32
+  lr: 3.0e-5           # token-classification heads often want slightly
+                        # higher LR than sequence classification
+  weight_decay: 0.01
+  epochs: 10            # ANERcorp is small (~5k sentences), needs more epochs
+  fp16: true
+  seed: 42
+  num_workers: 4
+
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  max_seq_length: 256   # newswire sentences, not full documents
+
+paths:
+  output_dir: "results_finetune/anercorp"

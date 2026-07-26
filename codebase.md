@@ -5,25 +5,39 @@
 │   ├── base.yaml
 │   ├── dry_test.yaml
 │   ├── eval_check.yaml
+│   ├── finetune_anercorp.yaml
+│   ├── finetune_arcd.yaml 
+│   ├── finetune_hard.yaml
+│   ├── finetune_xnli.yaml
 │   └── pilot.yaml
-└── src
-    ├── __init__.py
-    ├── data
-    │   └── prepare_data.py
-    ├── models
-    │   ├── __pycache__
-    │   │   └── mamba.cpython-311.pyc
-    │   └── mamba.py
-    ├── sanity
-    │   ├── __init__.py
-    │   └── test.py
-    ├── train.py
-    └── utils
-        ├── __init__.py
-        ├── __pycache__
-        │   ├── __init__.cpython-311.pyc
-        │   └── eval.cpython-311.pyc
-        └── eval.py
+├── src
+│   ├── __init__.py
+│   ├── data
+│   │   ├── __pycache__
+│   │   │   └── finetune_datasets.cpython-311.pyc
+│   │   ├── finetune_datasets.py
+│   │   └── prepare_data.py
+│   ├── finetune.py
+│   ├── models
+│   │   ├── __pycache__
+│   │   │   ├── mamba.cpython-311.pyc
+│   │   │   └── mamba_heads.cpython-311.pyc
+│   │   ├── mamba.py
+│   │   └── mamba_heads.py
+│   ├── sanity
+│   │   ├── __init__.py
+│   │   └── test.py
+│   ├── train.py
+│   └── utils
+│       ├── __init__.py
+│       ├── __pycache__
+│       │   ├── __init__.cpython-311.pyc
+│       │   ├── eval.cpython-311.pyc
+│       │   └── finetune_metrics.cpython-311.pyc
+│       ├── aggregate_results.py
+│       ├── eval.py
+│       └── finetune_metrics.py
+└── test.py
 
 ```
 
@@ -169,6 +183,159 @@ distributed:
 ```
 
 
+## configs/finetune_anercorp.yaml
+
+```yaml
+task:
+  name: "anercorp"
+
+pretrained_ckpt: "checkpoint/latest.pt"
+
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  gradient_checkpointing: false
+
+training:
+  batch_size: 16
+  eval_batch_size: 32
+  lr: 3.0e-5           # token-classification heads often want slightly
+                        # higher LR than sequence classification
+  weight_decay: 0.01
+  epochs: 10            # ANERcorp is small (~5k sentences), needs more epochs
+  fp16: true
+  seed: 42
+  num_workers: 4
+
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  max_seq_length: 256   # newswire sentences, not full documents
+
+paths:
+  output_dir: "results_finetune/anercorp"
+
+```
+
+
+## configs/finetune_arcd.yaml 
+
+```yaml 
+task:
+  name: "arcd"
+
+pretrained_ckpt: "checkpoint/latest.pt"
+
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  gradient_checkpointing: false
+
+training:
+  batch_size: 8         # QA sequences (question+context) run longer
+  eval_batch_size: 16
+  lr: 3.0e-5
+  weight_decay: 0.01
+  epochs: 15             # ARCD train is tiny (~700 examples), needs many epochs
+  fp16: true
+  seed: 42
+  num_workers: 4
+
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  max_seq_length: 512   # keep full 512 here, contexts are Wikipedia paragraphs
+
+paths:
+  output_dir: "results_finetune/arcd"
+
+```
+
+
+## configs/finetune_hard.yaml
+
+```yaml
+task:
+  name: "hard"        # sentiment, HARD hotel reviews, MSA-leaning but not pure MSA
+
+pretrained_ckpt: "checkpoint/latest.pt"   # your 200k-step base.yaml checkpoint
+
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  gradient_checkpointing: false   # not needed at this batch size/seq len
+
+training:
+  batch_size: 16
+  eval_batch_size: 32
+  lr: 2.0e-5           # standard finetune LR, much lower than pretraining lr
+  weight_decay: 0.01
+  epochs: 4
+  fp16: true
+  seed: 42
+  num_workers: 4
+
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  max_seq_length: 256   # reviews are short; 256 saves VRAM/time vs 512
+
+paths:
+  output_dir: "results_finetune/hard"
+
+```
+
+
+## configs/finetune_xnli.yaml
+
+```yaml
+task:
+  name: "xnli_ar"
+
+pretrained_ckpt: "checkpoint/latest.pt"
+
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  gradient_checkpointing: false
+
+training:
+  batch_size: 16
+  eval_batch_size: 32
+  lr: 2.0e-5
+  weight_decay: 0.01
+  epochs: 3            # XNLI train split is large (~390k), 3 epochs is plenty
+  fp16: true
+  seed: 42
+  num_workers: 4
+
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  max_seq_length: 128   # premise+hypothesis pairs are short
+
+paths:
+  output_dir: "results_finetune/xnli_ar"
+
+```
+
+
 ## configs/pilot.yaml
 
 ```yaml
@@ -212,6 +379,375 @@ paths:
 distributed:
   num_gpus: 4
   backend: "nccl"
+
+```
+
+
+## src/data/finetune_datasets.py
+
+```py
+"""
+Dataset loading + preprocessing for the MSA benchmark suite described in
+docs/BENCHMARKING.md. Each load_* function returns (train_ds, dev_ds,
+test_ds) as torch.utils.data.Dataset objects of pre-tokenized tensors.
+
+These benchmark datasets (hundreds to tens-of-thousands of rows) are
+small enough to tokenize eagerly and hold in RAM, so unlike
+ShardedTextDataset in train.py, no shard/index-on-disk machinery is
+needed here -- that machinery exists in train.py specifically because the
+120GB pretraining corpus can't fit in RAM; these benchmarks can.
+
+IMPORTANT -- verify before running at scale:
+This box has no network access to huggingface.co, so the exact column
+names below (marked with a comment) could not be checked against the
+live dataset viewer while writing this. Before your first real run of
+each load_* function, do:
+
+    from datasets import load_dataset
+    ds = load_dataset(<name>, trust_remote_code=True)
+    print(ds["train"].features)
+
+...and fix any column name mismatch. This is a 2-minute check, worth
+doing once per dataset rather than debugging a silent KeyError later.
+"""
+
+import random
+
+import torch
+from datasets import load_dataset
+from torch.utils.data import Dataset
+
+# ---------------------------------------------------------------------------
+# Sequence classification (HARD, XNLI-ar)
+# ---------------------------------------------------------------------------
+
+
+class ClassificationDataset(Dataset):
+    def __init__(self, texts, labels, tokenizer, max_len):
+        self.encodings = tokenizer(
+            texts, truncation=True, max_length=max_len, padding=False
+        )["input_ids"]
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, i):
+        return {
+            "input_ids": torch.tensor(self.encodings[i], dtype=torch.long),
+            "label": torch.tensor(self.labels[i], dtype=torch.long),
+        }
+
+
+def collate_classification(batch, pad_id):
+    max_len = max(x["input_ids"].size(0) for x in batch)
+    input_ids = torch.full((len(batch), max_len), pad_id, dtype=torch.long)
+    attn_mask = torch.zeros((len(batch), max_len), dtype=torch.float)
+    labels = torch.stack([x["label"] for x in batch])
+    for i, x in enumerate(batch):
+        L = x["input_ids"].size(0)
+        input_ids[i, :L] = x["input_ids"]
+        attn_mask[i, :L] = 1.0
+    return input_ids, attn_mask, labels
+
+
+def _split_train_only(texts, labels, seed=42, train_frac=0.8, dev_frac=0.1):
+    """Some Arabic benchmark datasets (HARD in particular) ship as a
+    single unsplit 'train' set. Carve out a fixed, seeded dev/test split
+    so results are at least reproducible across your own runs -- NOT
+    directly comparable to a paper's number unless they document the same
+    split, which AraBERT does not for HARD's raw form (they use the
+    AlGhafa-style curated split; note this in your writeup)."""
+    n = len(texts)
+    idx = list(range(n))
+    random.Random(seed).shuffle(idx)
+    n_train = int(n * train_frac)
+    n_dev = int(n * dev_frac)
+
+    def subset(lo, hi):
+        return [texts[i] for i in idx[lo:hi]], [labels[i] for i in idx[lo:hi]]
+
+    return (
+        subset(0, n_train),
+        subset(n_train, n_train + n_dev),
+        subset(n_train + n_dev, n),
+    )
+
+
+def load_hard(tokenizer, max_len):
+    """HARD -- Arabic hotel reviews (Elnagar et al. 2018), ratings 1-5.
+
+    Binarized per the standard AraBERT/ARBERT recipe: drop neutral rating
+    3, map 1-2 -> negative(0), 4-5 -> positive(1).
+
+    CAVEAT: reviews are user-written and include some dialectal Arabic
+    alongside MSA -- report this alongside the score rather than
+    presenting HARD as a clean MSA-only benchmark.
+    """
+    ds = load_dataset("hard", trust_remote_code=True)
+
+    texts, labels = [], []
+    for ex in ds["train"]:
+        # column names per the "hard" dataset card: "review", "rating"
+        rating = int(ex["rating"])
+        if rating == 3:
+            continue
+        texts.append(ex["review"])
+        labels.append(1 if rating > 3 else 0)
+
+    (tr_t, tr_l), (dv_t, dv_l), (te_t, te_l) = _split_train_only(texts, labels)
+    return (
+        ClassificationDataset(tr_t, tr_l, tokenizer, max_len),
+        ClassificationDataset(dv_t, dv_l, tokenizer, max_len),
+        ClassificationDataset(te_t, te_l, tokenizer, max_len),
+    )
+
+
+def load_xnli_ar(tokenizer, max_len):
+    """XNLI, Arabic config. 3-way NLI: entailment(0) / neutral(1) /
+    contradiction(2), matching the standard XNLI label convention.
+    Premise/hypothesis are packed as one sequence via tokenizer's
+    text-pair mode so [SEP] handling stays with the tokenizer, not
+    hand-rolled here."""
+    ds = load_dataset("xnli", "ar")
+
+    def build(split):
+        premises = ds[split]["premise"]
+        hyps = ds[split]["hypothesis"]
+        labels = ds[split]["label"]
+        enc = tokenizer(
+            premises, hyps, truncation=True, max_length=max_len, padding=False
+        )
+        cds = ClassificationDataset.__new__(ClassificationDataset)
+        cds.encodings = enc["input_ids"]
+        cds.labels = labels
+        return cds
+
+    return build("train"), build("validation"), build("test")
+
+
+# ---------------------------------------------------------------------------
+# Token classification (ANERcorp)
+# ---------------------------------------------------------------------------
+
+
+class TokenClassificationDataset(Dataset):
+    """Aligns word-level BIO tags to subword tokens: the first subword of
+    a word keeps the original tag, subsequent subwords of the same word
+    get -100 (ignored in the loss) -- the standard wordpiece/NER alignment
+    recipe (same one used by HF's own token-classification examples)."""
+
+    def __init__(self, word_lists, tag_lists, tokenizer, max_len, label2id):
+        self.tokenizer = tokenizer
+        self.max_len = max_len
+        self.label2id = label2id
+        self.word_lists = word_lists
+        self.tag_lists = tag_lists
+
+    def __len__(self):
+        return len(self.word_lists)
+
+    def __getitem__(self, i):
+        words = self.word_lists[i]
+        tags = self.tag_lists[i]
+        enc = self.tokenizer(
+            words,
+            is_split_into_words=True,
+            truncation=True,
+            max_length=self.max_len,
+            return_offsets_mapping=False,
+        )
+        word_ids = enc.word_ids()
+        labels = []
+        prev_word_id = None
+        for wid in word_ids:
+            if wid is None:
+                labels.append(-100)
+            elif wid != prev_word_id:
+                labels.append(self.label2id[tags[wid]])
+            else:
+                labels.append(-100)
+            prev_word_id = wid
+        return {
+            "input_ids": torch.tensor(enc["input_ids"], dtype=torch.long),
+            "labels": torch.tensor(labels, dtype=torch.long),
+        }
+
+
+def collate_ner(batch, pad_id):
+    max_len = max(x["input_ids"].size(0) for x in batch)
+    input_ids = torch.full((len(batch), max_len), pad_id, dtype=torch.long)
+    attn_mask = torch.zeros((len(batch), max_len), dtype=torch.float)
+    labels = torch.full((len(batch), max_len), -100, dtype=torch.long)
+    for i, x in enumerate(batch):
+        L = x["input_ids"].size(0)
+        input_ids[i, :L] = x["input_ids"]
+        attn_mask[i, :L] = 1.0
+        labels[i, :L] = x["labels"]
+    return input_ids, attn_mask, labels
+
+
+def load_anercorp(tokenizer, max_len):
+    """ANERcorp -- MSA newswire NER, 4 entity types (PER/LOC/ORG/MISC) in
+    BIO. NOTE: this uses a fast tokenizer's word_ids() alignment, so
+    tokenizer must be a *Fast tokenizer (AutoTokenizer gives you one by
+    default for AraBERT's vocab -- verify with `tokenizer.is_fast`).
+
+    Uses the community mirror at 'asas-ai/ANERCorp'. Verify the exact
+    column names (this sandbox has no live access to check the dataset
+    viewer) -- commonly either {"tokens","ner_tags"} or
+    {"tokens","pos_tags"}; adjust the two column-name strings below if
+    load_dataset raises a KeyError.
+    """
+    ds = load_dataset("asas-ai/ANERCorp")
+
+    TOKENS_COL = "tokens"  # <-- verify against ds["train"].features
+    TAGS_COL = "ner_tags"  # <-- verify against ds["train"].features
+
+    # Build label2id from whatever tag set is present in train, sorted
+    # for determinism across runs.
+    all_tags = sorted({t for ex in ds["train"] for t in ex[TAGS_COL]})
+    label2id = {t: i for i, t in enumerate(all_tags)}
+
+    def build(split):
+        words = [ex[TOKENS_COL] for ex in ds[split]]
+        tags = [ex[TAGS_COL] for ex in ds[split]]
+        return TokenClassificationDataset(words, tags, tokenizer, max_len, label2id)
+
+    splits = ds.keys()
+    train_ds = build("train")
+    dev_ds = build("validation") if "validation" in splits else build("test")
+    test_ds = build("test") if "test" in splits else dev_ds
+    train_ds.label2id = label2id  # stash for finetune.py to build the head + id2label
+    return train_ds, dev_ds, test_ds
+
+
+# ---------------------------------------------------------------------------
+# Extractive QA (ARCD)
+# ---------------------------------------------------------------------------
+
+
+class QADataset(Dataset):
+    """Simplified single-pass SQuAD-style preprocessing: no sliding-window
+    doc-stride, the [question] [SEP] [context] sequence is just truncated
+    to max_len. ARCD contexts are short paragraphs (not full articles) so
+    this loses very few answers in practice, but if you see
+    answer-not-found warnings above a few percent, that's the signal to
+    add a doc-stride windowing pass instead of silently accepting the
+    loss -- flagging this now rather than after the fact."""
+
+    def __init__(self, examples, tokenizer, max_len):
+        self.tokenizer = tokenizer
+        self.max_len = max_len
+        self.features = []
+        n_dropped = 0
+        for ex in examples:
+            feat = self._build_feature(ex, tokenizer, max_len)
+            if feat is None:
+                n_dropped += 1
+                continue
+            self.features.append(feat)
+        if n_dropped:
+            print(
+                f"[QADataset] dropped {n_dropped}/{len(examples)} examples whose "
+                "answer span fell outside the truncated context"
+            )
+
+    @staticmethod
+    def _build_feature(ex, tokenizer, max_len):
+        question = ex["question"]
+        context = ex["context"]
+        answer_text = ex["answers"]["text"][0]
+        answer_start = ex["answers"]["answer_start"][0]
+
+        enc = tokenizer(
+            question,
+            context,
+            truncation="only_second",
+            max_length=max_len,
+            return_offsets_mapping=True,
+        )
+        offsets = enc.pop("offset_mapping")
+        sequence_ids = enc.sequence_ids()
+
+        # find the context token span
+        ctx_start_tok = sequence_ids.index(1)
+        ctx_end_tok = len(sequence_ids) - 1 - sequence_ids[::-1].index(1)
+
+        char_start = answer_start
+        char_end = answer_start + len(answer_text)
+
+        if not (
+            offsets[ctx_start_tok][0] <= char_start
+            and offsets[ctx_end_tok][1] >= char_end
+        ):
+            return None  # answer got truncated out of the window
+
+        tok_start = ctx_start_tok
+        while tok_start <= ctx_end_tok and offsets[tok_start][0] <= char_start:
+            tok_start += 1
+        tok_start -= 1
+
+        tok_end = ctx_end_tok
+        while tok_end >= ctx_start_tok and offsets[tok_end][1] >= char_end:
+            tok_end -= 1
+        tok_end += 1
+
+        return {
+            "id": ex["id"],
+            "input_ids": enc["input_ids"],
+            "start": tok_start,
+            "end": tok_end,
+            "gold_answers": ex["answers"]["text"],
+        }
+
+    def __len__(self):
+        return len(self.features)
+
+    def __getitem__(self, i):
+        f = self.features[i]
+        return {
+            "id": f["id"],
+            "input_ids": torch.tensor(f["input_ids"], dtype=torch.long),
+            "start": torch.tensor(f["start"], dtype=torch.long),
+            "end": torch.tensor(f["end"], dtype=torch.long),
+            "gold_answers": f["gold_answers"],
+        }
+
+
+def collate_qa(batch, pad_id):
+    max_len = max(x["input_ids"].size(0) for x in batch)
+    input_ids = torch.full((len(batch), max_len), pad_id, dtype=torch.long)
+    attn_mask = torch.zeros((len(batch), max_len), dtype=torch.float)
+    starts = torch.stack([x["start"] for x in batch])
+    ends = torch.stack([x["end"] for x in batch])
+    ids = [x["id"] for x in batch]
+    gold = [x["gold_answers"] for x in batch]
+    for i, x in enumerate(batch):
+        L = x["input_ids"].size(0)
+        input_ids[i, :L] = x["input_ids"]
+        attn_mask[i, :L] = 1.0
+    return input_ids, attn_mask, starts, ends, ids, gold
+
+
+def load_arcd(tokenizer, max_len):
+    """ARCD -- 1,395 crowd-sourced QA pairs over Arabic Wikipedia
+    paragraphs. Ships with only train/validation; carve a fixed seeded
+    slice of validation into dev/test so you still have a held-out test
+    set that isn't the one you might tune stopping-epoch on."""
+    ds = load_dataset("arcd")
+
+    train_ex = list(ds["train"])
+    val_ex = list(ds["validation"])
+    random.Random(42).shuffle(val_ex)
+    half = len(val_ex) // 2
+    dev_ex, test_ex = val_ex[:half], val_ex[half:]
+
+    return (
+        QADataset(train_ex, tokenizer, max_len),
+        QADataset(dev_ex, tokenizer, max_len),
+        QADataset(test_ex, tokenizer, max_len),
+    )
 
 ```
 
@@ -526,6 +1062,336 @@ if __name__ == "__main__":
 ```
 
 
+## src/finetune.py
+
+```py
+"""
+Single-GPU finetuning + evaluation driver for the MSA benchmark suite
+(see docs/BENCHMARKING.md). Unlike train.py this is NOT a DDP script --
+these benchmark datasets (hundreds to ~90k rows) comfortably finetune on
+one RTX 2080Ti in well under an hour, so DDP would only add complexity
+with no real payoff at this scale. If you want to burn all 4 GPUs, just
+launch 4 different tasks/seeds in parallel instead (see BENCHMARKING.md).
+
+Launch:
+  python src/finetune.py --config configs/finetune_hard.yaml
+  python src/finetune.py --config configs/finetune_xnli.yaml
+  python src/finetune.py --config configs/finetune_anercorp.yaml
+  python src/finetune.py --config configs/finetune_arcd.yaml
+"""
+
+import argparse
+import json
+import os
+import random
+
+import numpy as np
+import torch
+import yaml
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from transformers import AutoTokenizer
+
+from data.finetune_datasets import (
+    collate_classification,
+    collate_ner,
+    collate_qa,
+    load_anercorp,
+    load_arcd,
+    load_hard,
+    load_xnli_ar,
+)
+from models.mamba_heads import (
+    MambaForQuestionAnswering,
+    MambaForSequenceClassification,
+    MambaForTokenClassification,
+    load_pretrained_encoder,
+)
+from utils.finetune_metrics import (
+    classification_metrics,
+    qa_metrics,
+    seqeval_ner_metrics,
+)
+
+TASK_REGISTRY = {
+    "hard": {"loader": load_hard, "task_type": "classification", "num_labels": 2},
+    "xnli_ar": {"loader": load_xnli_ar, "task_type": "classification", "num_labels": 3},
+    "anercorp": {"loader": load_anercorp, "task_type": "ner"},
+    "arcd": {"loader": load_arcd, "task_type": "qa"},
+}
+
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+
+def evaluate_classification(model, loader, device, fp16):
+    model.eval()
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for input_ids, attn_mask, labels in loader:
+            input_ids, attn_mask = input_ids.to(device), attn_mask.to(device)
+            with torch.amp.autocast(device_type="cuda", enabled=fp16):
+                logits = model(input_ids, attn_mask)["logits"]
+            all_preds += logits.argmax(-1).cpu().tolist()
+            all_labels += labels.tolist()
+    model.train()
+    return classification_metrics(all_preds, all_labels)
+
+
+def evaluate_ner(model, loader, device, fp16, id2label):
+    model.eval()
+    pred_tags, gold_tags = [], []
+    with torch.no_grad():
+        for input_ids, attn_mask, labels in loader:
+            input_ids, attn_mask = input_ids.to(device), attn_mask.to(device)
+            with torch.amp.autocast(device_type="cuda", enabled=fp16):
+                logits = model(input_ids, attn_mask)["logits"]
+            preds = logits.argmax(-1).cpu()
+            for p_row, l_row in zip(preds, labels):
+                p_seq, g_seq = [], []
+                for p, l in zip(p_row.tolist(), l_row.tolist()):
+                    if l == -100:
+                        continue
+                    p_seq.append(id2label[p])
+                    g_seq.append(id2label[l])
+                pred_tags.append(p_seq)
+                gold_tags.append(g_seq)
+    model.train()
+    return seqeval_ner_metrics(pred_tags, gold_tags)
+
+
+def evaluate_qa(model, loader, device, fp16):
+    model.eval()
+    preds, golds = {}, {}
+    with torch.no_grad():
+        for input_ids, attn_mask, starts, ends, ids, gold in loader:
+            input_ids, attn_mask = input_ids.to(device), attn_mask.to(device)
+            with torch.amp.autocast(device_type="cuda", enabled=fp16):
+                out = model(input_ids, attn_mask)
+            start_idx = out["start_logits"].argmax(-1).cpu().tolist()
+            end_idx = out["end_logits"].argmax(-1).cpu().tolist()
+            for i, qid in enumerate(ids):
+                s, e = start_idx[i], end_idx[i]
+                if e < s:
+                    e = s
+                span_ids = input_ids[i, s : e + 1].cpu().tolist()
+                # decoding here needs the tokenizer; caller reattaches it
+                preds[qid] = span_ids
+                golds[qid] = gold[i]
+    model.train()
+    return preds, golds
+
+
+def build_model(task_type, mcfg, num_labels=None):
+    if task_type == "classification":
+        return MambaForSequenceClassification(mcfg, num_labels=num_labels)
+    if task_type == "ner":
+        return MambaForTokenClassification(mcfg, num_labels=num_labels)
+    if task_type == "qa":
+        return MambaForQuestionAnswering(mcfg)
+    raise ValueError(f"unknown task_type: {task_type}")
+
+
+def main(cfg_path):
+    cfg = yaml.safe_load(open(cfg_path))
+    task_name = cfg["task"]["name"]
+    task_info = TASK_REGISTRY[task_name]
+    task_type = task_info["task_type"]
+
+    set_seed(cfg["training"].get("seed", 42))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    tokenizer = AutoTokenizer.from_pretrained(cfg["data"]["tokenizer_name"])
+    assert tokenizer.is_fast, "finetune.py requires a fast tokenizer (word_ids/offsets)"
+
+    print(f"loading dataset for task={task_name} ...")
+    if task_type == "ner":
+        train_ds, dev_ds, test_ds = task_info["loader"](
+            tokenizer, cfg["data"]["max_seq_length"]
+        )
+        label2id = train_ds.label2id
+        id2label = {v: k for k, v in label2id.items()}
+        num_labels = len(label2id)
+    else:
+        train_ds, dev_ds, test_ds = task_info["loader"](
+            tokenizer, cfg["data"]["max_seq_length"]
+        )
+        num_labels = task_info.get("num_labels")
+
+    mcfg = dict(cfg["model"])
+    mcfg["vocab_size"] = tokenizer.vocab_size
+    mcfg["pad_token_id"] = tokenizer.pad_token_id
+    model = build_model(task_type, mcfg, num_labels=num_labels).to(device)
+
+    if cfg.get("pretrained_ckpt"):
+        load_pretrained_encoder(model.encoder, cfg["pretrained_ckpt"], device=device)
+        print(f"loaded pretrained encoder from {cfg['pretrained_ckpt']}")
+    else:
+        print(
+            "WARNING: no pretrained_ckpt set in config -- training encoder from scratch, "
+            "this defeats the point of the benchmark (comparing pretraining quality)"
+        )
+
+    tcfg = cfg["training"]
+    if task_type == "classification":
+        collate = lambda b: collate_classification(b, tokenizer.pad_token_id)
+    elif task_type == "ner":
+        collate = lambda b: collate_ner(b, tokenizer.pad_token_id)
+    else:
+        collate = lambda b: collate_qa(b, tokenizer.pad_token_id)
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=tcfg["batch_size"],
+        shuffle=True,
+        num_workers=tcfg["num_workers"],
+        collate_fn=collate,
+    )
+    dev_loader = DataLoader(
+        dev_ds,
+        batch_size=tcfg["eval_batch_size"],
+        shuffle=False,
+        num_workers=tcfg["num_workers"],
+        collate_fn=collate,
+    )
+    test_loader = DataLoader(
+        test_ds,
+        batch_size=tcfg["eval_batch_size"],
+        shuffle=False,
+        num_workers=tcfg["num_workers"],
+        collate_fn=collate,
+    )
+
+    optim = torch.optim.AdamW(
+        model.parameters(), lr=tcfg["lr"], weight_decay=tcfg["weight_decay"]
+    )
+    scaler = torch.amp.GradScaler("cuda", enabled=tcfg["fp16"])
+    total_steps = len(train_loader) * tcfg["epochs"]
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optim, lambda step: max(0.0, (total_steps - step) / max(1, total_steps))
+    )
+
+    os.makedirs(cfg["paths"]["output_dir"], exist_ok=True)
+    best_metric, best_state = -1.0, None
+    primary_metric = {"classification": "macro_f1", "ner": "f1", "qa": "f1"}[task_type]
+
+    model.train()
+    for epoch in range(tcfg["epochs"]):
+        pbar = tqdm(
+            train_loader, desc=f"epoch {epoch+1}/{tcfg['epochs']}", dynamic_ncols=True
+        )
+        for batch in pbar:
+            optim.zero_grad()
+            if task_type == "classification":
+                input_ids, attn_mask, labels = batch
+                input_ids, attn_mask, labels = (
+                    input_ids.to(device),
+                    attn_mask.to(device),
+                    labels.to(device),
+                )
+                with torch.amp.autocast(device_type="cuda", enabled=tcfg["fp16"]):
+                    out = model(input_ids, attn_mask, labels)
+            elif task_type == "ner":
+                input_ids, attn_mask, labels = batch
+                input_ids, attn_mask, labels = (
+                    input_ids.to(device),
+                    attn_mask.to(device),
+                    labels.to(device),
+                )
+                with torch.amp.autocast(device_type="cuda", enabled=tcfg["fp16"]):
+                    out = model(input_ids, attn_mask, labels)
+            else:
+                input_ids, attn_mask, starts, ends, ids, gold = batch
+                input_ids, attn_mask = input_ids.to(device), attn_mask.to(device)
+                starts, ends = starts.to(device), ends.to(device)
+                with torch.amp.autocast(device_type="cuda", enabled=tcfg["fp16"]):
+                    out = model(input_ids, attn_mask, starts, ends)
+
+            loss = out["loss"]
+            scaler.scale(loss).backward()
+            scaler.unscale_(optim)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            scaler.step(optim)
+            scaler.update()
+            scheduler.step()
+            pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+
+        # --- end of epoch: evaluate on dev ---
+        if task_type == "classification":
+            metrics = evaluate_classification(model, dev_loader, device, tcfg["fp16"])
+        elif task_type == "ner":
+            metrics = evaluate_ner(model, dev_loader, device, tcfg["fp16"], id2label)
+        else:
+            preds, golds = evaluate_qa(model, dev_loader, device, tcfg["fp16"])
+            preds_text = {
+                qid: tokenizer.decode(ids, skip_special_tokens=True)
+                for qid, ids in preds.items()
+            }
+            metrics = qa_metrics(preds_text, golds)
+
+        print(f"[epoch {epoch+1}] dev metrics: {metrics}")
+        if metrics[primary_metric] > best_metric:
+            best_metric = metrics[primary_metric]
+            best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+            print(
+                f"  -> new best ({primary_metric}={best_metric:.4f}), checkpointing in memory"
+            )
+
+    # --- final test evaluation with best dev checkpoint ---
+    if best_state is not None:
+        model.load_state_dict(best_state)
+    if task_type == "classification":
+        test_metrics = evaluate_classification(model, test_loader, device, tcfg["fp16"])
+    elif task_type == "ner":
+        test_metrics = evaluate_ner(model, test_loader, device, tcfg["fp16"], id2label)
+    else:
+        preds, golds = evaluate_qa(model, test_loader, device, tcfg["fp16"])
+        preds_text = {
+            qid: tokenizer.decode(ids, skip_special_tokens=True)
+            for qid, ids in preds.items()
+        }
+        test_metrics = qa_metrics(preds_text, golds)
+
+    print(
+        f"=== FINAL test metrics for {task_name} (seed={tcfg.get('seed', 42)}): {test_metrics} ==="
+    )
+
+    result_path = os.path.join(
+        cfg["paths"]["output_dir"], f"{task_name}_seed{tcfg.get('seed', 42)}.json"
+    )
+    with open(result_path, "w") as f:
+        json.dump(
+            {
+                "task": task_name,
+                "seed": tcfg.get("seed", 42),
+                "dev_best": best_metric,
+                "test": test_metrics,
+            },
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
+    print(f"wrote {result_path}")
+
+    if best_state is not None:
+        ckpt_path = os.path.join(cfg["paths"]["output_dir"], f"{task_name}_best.pt")
+        torch.save(best_state, ckpt_path)
+        print(f"wrote {ckpt_path}")
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser()
+    p.add_argument("--config", required=True)
+    args = p.parse_args()
+    main(args.config)
+
+```
+
+
 ## src/models/mamba.py
 
 ```py
@@ -715,6 +1581,167 @@ class MambaForMaskedLM(nn.Module):
                 logits.view(-1, logits.size(-1)), labels.view(-1), ignore_index=-100
             )
         return {"loss": loss, "logits": logits, "hidden_states": hidden}
+
+```
+
+
+## src/models/mamba_heads.py
+
+```py
+"""
+Task heads for finetuning the pretrained Bi-Mamba encoder on the MSA
+benchmark suite (see docs/BENCHMARKING.md). Mirrors the split already used
+by MambaForMaskedLM in mamba.py: a shared MambaEncoder trunk + a thin,
+task-specific head on top, so the same pretrained checkpoint can be reused
+across sequence classification, token classification, and extractive QA
+without touching the encoder implementation itself.
+"""
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from .mamba import MambaEncoder, MambaForMaskedLM
+
+
+def load_pretrained_encoder(encoder, ckpt_path, device="cpu", strict=False):
+    """Loads encoder.* weights from a MambaForMaskedLM training checkpoint
+    (as saved by train.py: ckpt["model"] is model.module.state_dict()).
+    Drops mlm_head.*/decoder.* keys since those don't exist on task heads.
+    strict=False by default: the tied decoder + mlm_head are *expected* to
+    be absent here, that's not a real mismatch, but we still print
+    whatever comes back so a genuinely wrong checkpoint isn't silently
+    swallowed.
+    """
+    ckpt = torch.load(ckpt_path, map_location=device)
+    state_dict = ckpt["model"] if "model" in ckpt else ckpt
+    encoder_state = {
+        k[len("encoder.") :]: v
+        for k, v in state_dict.items()
+        if k.startswith("encoder.")
+    }
+    if not encoder_state:
+        raise ValueError(
+            f"no 'encoder.*' keys found in {ckpt_path} -- is this really a "
+            "MambaForMaskedLM training checkpoint?"
+        )
+    missing, unexpected = encoder.load_state_dict(encoder_state, strict=strict)
+    if missing:
+        print(f"[load_pretrained_encoder] missing keys: {missing}")
+    if unexpected:
+        print(f"[load_pretrained_encoder] unexpected keys: {unexpected}")
+    return encoder
+
+
+def _mean_pool(hidden, attention_mask):
+    """Mean-pool over real (non-padding) positions. Preferred over a
+    CLS-token pool here: unlike BERT, this encoder was never pretrained
+    with a dedicated [CLS] aggregation objective (MLM only), so there's no
+    reason to expect position 0 to hold a good sentence summary. Mean
+    pooling over the bidirectional Mamba output is the safer default for
+    a from-scratch architecture."""
+    mask = attention_mask.unsqueeze(-1).to(hidden.dtype)
+    summed = (hidden * mask).sum(dim=1)
+    counts = mask.sum(dim=1).clamp(min=1e-6)
+    return summed / counts
+
+
+class MambaForSequenceClassification(nn.Module):
+    """Sentence(-pair) classification: sentiment (HARD), NLI (XNLI-ar),
+    topic/news classification (SANAD/ASND). For sentence-pair tasks,
+    concatenate premise + [SEP] + hypothesis before tokenizing -- the
+    tokenizer owns sequence packing here, same convention as the rest of
+    this codebase, the model itself stays pair-agnostic."""
+
+    def __init__(self, config, num_labels, dropout=None):
+        super().__init__()
+        self.num_labels = num_labels
+        self.encoder = MambaEncoder(config)
+        d_model = config["d_model"]
+        self.dropout = nn.Dropout(
+            dropout if dropout is not None else config.get("dropout", 0.1)
+        )
+        self.classifier = nn.Linear(d_model, num_labels)
+        self.classifier.apply(MambaForMaskedLM._init_weights)
+
+    def forward(self, input_ids, attention_mask=None, labels=None):
+        hidden = self.encoder(input_ids, attention_mask)
+        pooled = (
+            _mean_pool(hidden, attention_mask)
+            if attention_mask is not None
+            else hidden.mean(dim=1)
+        )
+        logits = self.classifier(self.dropout(pooled))
+        loss = None
+        if labels is not None:
+            loss = F.cross_entropy(logits, labels)
+        return {"loss": loss, "logits": logits}
+
+
+class MambaForTokenClassification(nn.Module):
+    """Token-level classification: NER (ANERcorp), POS tagging. labels use
+    -100 for positions to ignore (padding, and for wordpiece tokenizers,
+    non-first subword pieces of a word) -- same ignore_index convention as
+    the MLM head in mamba.py, kept consistent on purpose."""
+
+    def __init__(self, config, num_labels, dropout=None):
+        super().__init__()
+        self.num_labels = num_labels
+        self.encoder = MambaEncoder(config)
+        d_model = config["d_model"]
+        self.dropout = nn.Dropout(
+            dropout if dropout is not None else config.get("dropout", 0.1)
+        )
+        self.classifier = nn.Linear(d_model, num_labels)
+        self.classifier.apply(MambaForMaskedLM._init_weights)
+
+    def forward(self, input_ids, attention_mask=None, labels=None):
+        hidden = self.encoder(input_ids, attention_mask)
+        logits = self.classifier(self.dropout(hidden))
+        loss = None
+        if labels is not None:
+            loss = F.cross_entropy(
+                logits.view(-1, self.num_labels), labels.view(-1), ignore_index=-100
+            )
+        return {"loss": loss, "logits": logits}
+
+
+class MambaForQuestionAnswering(nn.Module):
+    """Extractive QA (ARCD): predicts start/end token indices of the
+    answer span within a packed [question] [SEP] [context] sequence. Two
+    independent linear heads on the shared encoder output -- same
+    span-prediction formulation used for BERT-on-SQuAD."""
+
+    def __init__(self, config):
+        super().__init__()
+        self.encoder = MambaEncoder(config)
+        d_model = config["d_model"]
+        self.qa_outputs = nn.Linear(d_model, 2)
+        self.qa_outputs.apply(MambaForMaskedLM._init_weights)
+
+    def forward(
+        self, input_ids, attention_mask=None, start_positions=None, end_positions=None
+    ):
+        hidden = self.encoder(input_ids, attention_mask)
+        logits = self.qa_outputs(hidden)
+        start_logits, end_logits = logits.split(1, dim=-1)
+        start_logits = start_logits.squeeze(-1)
+        end_logits = end_logits.squeeze(-1)
+
+        loss = None
+        if start_positions is not None and end_positions is not None:
+            ignored_index = start_logits.size(1)
+            start_positions = start_positions.clamp(0, ignored_index)
+            end_positions = end_positions.clamp(0, ignored_index)
+            start_loss = F.cross_entropy(
+                start_logits, start_positions, ignore_index=ignored_index
+            )
+            end_loss = F.cross_entropy(
+                end_logits, end_positions, ignore_index=ignored_index
+            )
+            loss = (start_loss + end_loss) / 2
+
+        return {"loss": loss, "start_logits": start_logits, "end_logits": end_logits}
 
 ```
 
@@ -1091,6 +2118,87 @@ if __name__ == "__main__":
 ```
 
 
+## src/utils/aggregate_results.py
+
+```py
+"""
+Aggregates the per-seed result JSONs written by finetune.py
+(results_finetune/<task>/<task>_seed<seed>.json) into a mean +- std
+summary per task, printed as a markdown table ready to paste into the
+paper. Kept as a standalone script rather than folded into finetune.py
+since aggregation happens once you have several runs, not per-run.
+
+Usage:
+  python src/utils/aggregate_results.py --results_dir results_finetune
+"""
+
+import argparse
+import glob
+import json
+import os
+import statistics
+from collections import defaultdict
+
+
+def load_results(results_dir):
+    """Returns {task_name: [result_dict, ...]} across all seeds found."""
+    by_task = defaultdict(list)
+    for path in glob.glob(os.path.join(results_dir, "*", "*_seed*.json")):
+        with open(path) as f:
+            r = json.load(f)
+        by_task[r["task"]].append(r)
+    return by_task
+
+
+def summarize(results):
+    """results: list of {"test": {metric: value, ...}, "seed": int, ...}
+    Returns {metric: (mean, std, n)} across seeds. std is 0.0 (not NaN)
+    for n==1 so a single-seed run still prints cleanly -- but the table
+    caller should flag n==1 as "not yet a real variance estimate"."""
+    metrics = defaultdict(list)
+    for r in results:
+        for k, v in r["test"].items():
+            metrics[k].append(v)
+    summary = {}
+    for k, vals in metrics.items():
+        mean = statistics.mean(vals)
+        std = statistics.pstdev(vals) if len(vals) > 1 else 0.0
+        summary[k] = (mean, std, len(vals))
+    return summary
+
+
+def main(results_dir):
+    by_task = load_results(results_dir)
+    if not by_task:
+        print(f"no result JSONs found under {results_dir}/*/*_seed*.json")
+        return
+
+    print("| Task | Metric | Mean | Std | N seeds |")
+    print("|---|---|---|---|---|")
+    for task, results in sorted(by_task.items()):
+        summary = summarize(results)
+        for metric, (mean, std, n) in sorted(summary.items()):
+            flag = "  (single run, not a variance estimate)" if n == 1 else ""
+            print(f"| {task} | {metric} | {mean:.4f} | {std:.4f} | {n}{flag} |")
+
+    n_seeds = {task: len(r) for task, r in by_task.items()}
+    under_powered = [t for t, n in n_seeds.items() if n < 3]
+    if under_powered:
+        print(
+            f"\nNote: {under_powered} have fewer than 3 seeds -- run "
+            f"`make benchmark-seeds TASK=<name>` before reporting these as final."
+        )
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser()
+    p.add_argument("--results_dir", default="results_finetune")
+    args = p.parse_args()
+    main(args.results_dir)
+
+```
+
+
 ## src/utils/eval.py
 
 ```py
@@ -1151,6 +2259,132 @@ def evaluate(model, val_loader, device, fp16, max_batches=None):
     perplexity = math.exp(mean_loss) if mean_loss < 20 else float("inf")
 
     return {"loss": mean_loss, "accuracy": accuracy, "perplexity": perplexity}
+
+```
+
+
+## src/utils/finetune_metrics.py
+
+```py
+"""
+Metrics for the MSA benchmark suite. Kept separate from finetune.py, same
+philosophy as src/utils/eval.py being separate from train.py: metric logic
+that can be tested or reused independently of the training loop.
+"""
+
+import collections
+import re
+import string
+
+import numpy as np
+
+
+def classification_metrics(preds, labels):
+    """Accuracy + macro-F1, computed by hand (no sklearn dependency --
+    same dependency-free spirit as the BloomFilter in prepare_data.py)."""
+    preds = np.array(preds)
+    labels = np.array(labels)
+    acc = (preds == labels).mean()
+    classes = sorted(set(labels.tolist()) | set(preds.tolist()))
+    f1s = []
+    for c in classes:
+        tp = int(((preds == c) & (labels == c)).sum())
+        fp = int(((preds == c) & (labels != c)).sum())
+        fn = int(((preds != c) & (labels == c)).sum())
+        prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
+        f1s.append(f1)
+    return {"accuracy": float(acc), "macro_f1": float(np.mean(f1s))}
+
+
+def seqeval_ner_metrics(pred_tags, gold_tags):
+    """Entity-level precision/recall/F1 over BIO tag sequences -- the
+    metric actually reported in the ANERcorp/AraBERT/ARBERT literature,
+    NOT token-level accuracy (token accuracy is inflated by the dominant
+    'O' class and isn't comparable to published numbers).
+
+    Requires `seqeval` (pip install seqeval --break-system-packages).
+    Falls back to token accuracy with a loud warning if it's missing, so
+    this never silently reports a number that looks like the standard
+    metric but isn't.
+    """
+    try:
+        from seqeval.metrics import f1_score, precision_score, recall_score
+
+        return {
+            "precision": precision_score(gold_tags, pred_tags),
+            "recall": recall_score(gold_tags, pred_tags),
+            "f1": f1_score(gold_tags, pred_tags),
+        }
+    except ImportError:
+        correct = sum(
+            p == g
+            for pseq, gseq in zip(pred_tags, gold_tags)
+            for p, g in zip(pseq, gseq)
+        )
+        total = sum(len(gseq) for gseq in gold_tags)
+        print(
+            "[finetune_metrics] seqeval not installed -- reporting TOKEN accuracy, "
+            "which is NOT comparable to published entity-level F1. "
+            "Run: pip install seqeval --break-system-packages"
+        )
+        return {"token_accuracy": correct / max(1, total)}
+
+
+_AR_DIACRITICS = re.compile(r"[\u0617-\u061A\u064B-\u0652\u0670\u06D6-\u06ED]")
+
+
+def _normalize_arabic_answer(s):
+    """SQuAD-style normalization adapted for Arabic: strip diacritics,
+    punctuation, and collapse whitespace, so e.g. trailing punctuation or
+    an optional diacritic doesn't spuriously fail an exact match. Reuses
+    the same diacritics regex as prepare_data.py on purpose, for
+    consistency across the codebase."""
+    s = _AR_DIACRITICS.sub("", s)
+    s = "".join(ch for ch in s if ch not in string.punctuation and ch not in "،؛؟”“")
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def qa_metrics(preds, golds):
+    """preds: {id: predicted_answer_text}
+    golds: {id: [gold_answer_text, ...]}   (ARCD/SQuAD allow multiple refs)
+    Returns SQuAD-style EM and token-overlap F1, averaged over examples,
+    taking the best-matching gold answer per example.
+    """
+    em_total, f1_total = 0.0, 0.0
+    for qid, gold_list in golds.items():
+        pred = _normalize_arabic_answer(preds.get(qid, ""))
+        best_em, best_f1 = 0.0, 0.0
+        for gold in gold_list:
+            gold_n = _normalize_arabic_answer(gold)
+            em = float(pred == gold_n)
+            pred_toks, gold_toks = pred.split(), gold_n.split()
+            common = collections.Counter(pred_toks) & collections.Counter(gold_toks)
+            num_same = sum(common.values())
+            if num_same == 0:
+                f1 = 0.0
+            else:
+                prec = num_same / max(1, len(pred_toks))
+                rec = num_same / max(1, len(gold_toks))
+                f1 = 2 * prec * rec / (prec + rec)
+            best_em, best_f1 = max(best_em, em), max(best_f1, f1)
+        em_total += best_em
+        f1_total += best_f1
+    n = max(1, len(golds))
+    return {"exact_match": 100 * em_total / n, "f1": 100 * f1_total / n}
+
+```
+
+
+## test.py
+
+```py
+from datasets import load_dataset
+
+ds = load_dataset("asas-ai/ANERCorp")
+print(ds["train"].features)
 
 ```
 
