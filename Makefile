@@ -4,7 +4,7 @@ NPROC       ?= 4
 TIMESTAMP   := $(shell date +%Y%m%d_%H%M%S)
 LOG_DIR     := logs
 
-.PHONY: all prepare-data train clean-logs dry-test-data dry-test-train dry-test
+.PHONY: all prepare-data train clean-logs dry-test-data dry-test-train dry-test codebase
 
 all: prepare-data train
 
@@ -35,3 +35,6 @@ dry-test: dry-test-data dry-test-train
 
 clean-logs:
 	rm -f $(LOG_DIR)/*.log
+
+codebase:
+	CodeWeaver -input  . -include ".py,.yaml" -ignore "\.zed,\.ropeproject,.txt,.pkl,\.git,\.gitignore"

@@ -7,12 +7,16 @@
 │   ├── eval_check.yaml
 │   └── pilot.yaml
 └── src
+    ├── __init__.py
     ├── data
     │   └── prepare_data.py
     ├── models
     │   ├── __pycache__
     │   │   └── mamba.cpython-311.pyc
     │   └── mamba.py
+    ├── sanity
+    │   ├── __init__.py
+    │   └── test.py
     ├── train.py
     └── utils
         ├── __init__.py
@@ -37,7 +41,7 @@ model:
   max_position_embeddings: 512
   dropout: 0.1
   pad_token_id: 0
-  gradient_checkpointing: true   # required to fit on 11GB cards
+  gradient_checkpointing: true
 
 training:
   batch_size: 8
@@ -627,6 +631,9 @@ class BiMambaBlock(nn.Module):
         merged = self.merge(torch.cat([fwd, bwd], dim=-1))
         x = residual + self.dropout(merged)
         x = x + self.dropout(self.ffn(self.ffn_norm(x)))
+
+        if attention_mask is not None:
+            x = x * attention_mask.unsqueeze(-1)
         return x
 
 
@@ -708,6 +715,47 @@ class MambaForMaskedLM(nn.Module):
                 logits.view(-1, logits.size(-1)), labels.view(-1), ignore_index=-100
             )
         return {"loss": loss, "logits": logits, "hidden_states": hidden}
+
+```
+
+
+## src/sanity/test.py
+
+```py
+import torch
+
+from models.mamba import MambaForMaskedLM
+
+torch.manual_seed(0)
+device = "cuda"
+config = {
+    "vocab_size": 1000,
+    "d_model": 64,
+    "n_layer": 2,
+    "d_state": 16,
+    "d_conv": 4,
+    "expand": 2,
+    "pad_token_id": 0,
+    "dropout": 0.0,
+}
+model = MambaForMaskedLM(config).to(device).eval()
+
+B, L = 2, 20
+real_len = 10
+input_ids_a = torch.randint(1, 1000, (B, L), device=device)
+attn_mask = torch.zeros(B, L, device=device)
+attn_mask[:, :real_len] = 1
+input_ids_a[:, real_len:] = 0
+
+input_ids_b = input_ids_a.clone()
+input_ids_b[:, real_len:] = torch.randint(1, 1000, (B, L - real_len), device=device)
+
+with torch.no_grad():
+    out_a = model(input_ids_a, attn_mask)["logits"]
+    out_b = model(input_ids_b, attn_mask)["logits"]
+
+real_diff = (out_a[:, :real_len] - out_b[:, :real_len]).abs().max().item()
+print("max diff at REAL positions from changing padding content:", real_diff)
 
 ```
 
