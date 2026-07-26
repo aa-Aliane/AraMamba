@@ -1,5 +1,5 @@
 from datasets import load_dataset
 
-ds = load_dataset("Elnagara/hard")
-print(ds["train"].features)
-print(ds["train"][0])
+ds = load_dataset("asas-ai/ANERCorp")
+print(ds["train"].column_names)
+print(ds["train"][:15])

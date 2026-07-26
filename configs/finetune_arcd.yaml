@@ -18,7 +18,11 @@ training:
   eval_batch_size: 16
   lr: 3.0e-5
   weight_decay: 0.01
-  epochs: 15             # ARCD train is tiny (~700 examples), needs many epochs
+  epochs: 25             # bumped from 15 -- ARCD is tiny (~700 examples),
+                          # dev F1 was still climbing at epoch 14/15 last run
+  warmup_steps: 50       # ~10% of total steps at single-GPU step counts;
+                          # last run had no warmup and showed loss instability
+                          # around epoch 6 -- too few total steps + no warmup
   fp16: true
   seed: 42
   num_workers: 4

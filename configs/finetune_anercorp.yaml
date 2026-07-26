@@ -1,3 +1,6 @@
+# ==============================================================================
+# Task & Model Settings
+# ==============================================================================
 task:
   name: "anercorp"
 
@@ -13,20 +16,37 @@ model:
   dropout: 0.1
   gradient_checkpointing: false
 
+# ==============================================================================
+# Fine-Tuning & Hyperparameters
+# ==============================================================================
 training:
-  batch_size: 16
+  # Batch size per GPU (4 * 4 = 16 effective batch size across 4 GPUs)
+  # Keeping effective batch size small adds needed noise to prevent dev memorization
+  batch_size: 4
   eval_batch_size: 32
-  lr: 3.0e-5           # token-classification heads often want slightly
-                        # higher LR than sequence classification
+
+  # Learning rate & Schedule
+  lr: 2.0e-5
   weight_decay: 0.01
-  epochs: 10            # ANERcorp is small (~5k sentences), needs more epochs
+  warmup_ratio: 0.05
+  lr_scheduler_type: "cosine"
+  max_grad_norm: 1.0
+
+  # Duration & Precision
+  epochs: 5                   # Mamba converges by epoch 4–5 on ANERcorp
   fp16: true
   seed: 42
   num_workers: 4
 
+# ==============================================================================
+# Data & Tokenizer Configuration
+# ==============================================================================
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
-  max_seq_length: 256   # newswire sentences, not full documents
+  max_seq_length: 128         # Cuts out padding noise from isolated news sentences
 
+# ==============================================================================
+# Paths
+# ==============================================================================
 paths:
   output_dir: "results_finetune/anercorp"
