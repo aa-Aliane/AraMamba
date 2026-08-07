@@ -11,31 +11,6 @@ causal-conv1d installed and building against your CUDA/torch version).
 Falls back to a slow pure-PyTorch scan otherwise so the code still runs
 if the CUDA kernels fail to build on your 2080Tis -- use the fallback only
 to sanity-check correctness, not for real training (it's ~10-50x slower).
-
-PADDING NOTE (read before touching the flip logic below):
-Pretraining (train.py / ShardedTextDataset / prepare_data.py's chunk_doc())
-feeds fixed-length, unpadded chunks -- attention_mask is effectively all-1s
-or None the whole run. Finetuning (finetune.py) on variable-length
-sentence/QA data uses real right-padding. A naive `h.flip(dims=[1])` puts
-padding *first* in the sequence the backward mixer consumes; since the
-mixer's projections (x_proj/dt_proj) have biases, an all-zero padded input
-still produces a non-zero SSM state update, and that corrupted state then
-carries into every real token for the rest of the backward pass. This is
-invisible to mean-pooled classification (HARD) but devastating for
-per-token readouts (NER span tags, QA start/end logits) -- exactly the
-"HARD is great, ARCD/ANERcorp are bad" pattern this comment is here to
-explain.
-
-_flip_valid() reverses only the real tokens per example, leaving padding
-at the tail where it can't contaminate anything -- i.e. it reproduces
-exactly the unpadded-sequence shape the encoder was actually pretrained
-on. When attention_mask has no padding (all 1s), _flip_valid produces
-bit-identical output to plain .flip(dims=[1]), so this is a no-op for
-the pretraining path and does not change, invalidate, or require redoing
-any existing pretrained checkpoint. If you ever extend pretraining itself
-to use padded/variable-length batches, this is the code path that keeps
-that safe too -- don't revert it back to a plain .flip() without
-re-reading this note.
 """
 
 import torch
@@ -48,30 +23,6 @@ try:
     MAMBA_SSM_AVAILABLE = True
 except ImportError:
     MAMBA_SSM_AVAILABLE = False
-
-
-def _flip_valid(x, attention_mask):
-    """Reverse only the real (non-pad) tokens per example, keeping
-    padding at the tail. Unlike a plain .flip(), this never puts padding
-    ahead of real content in the causal order the backward mixer sees --
-    matching what the encoder was actually pretrained on (unpadded
-    sequences). Self-inverse: applying it twice with the same
-    attention_mask restores the original order, so it's used both to
-    build the backward mixer's input and to undo the reorder on its
-    output.
-
-    When attention_mask is all-1s (no padding -- the pretraining case),
-    this is mathematically identical to x.flip(dims=[1]).
-    """
-    B, L, D = x.shape
-    lengths = attention_mask.sum(dim=1).long()  # (B,)
-    idx = torch.arange(L, device=x.device).unsqueeze(0).expand(B, L).clone()
-    for b in range(B):
-        n = lengths[b].item()
-        if n > 0:
-            idx[b, :n] = torch.arange(n - 1, -1, -1, device=x.device)
-        # idx[b, n:] stays as-is -> padding positions stay in place
-    return torch.gather(x, 1, idx.unsqueeze(-1).expand(-1, -1, D))
 
 
 class NaiveSSM(nn.Module):
@@ -142,19 +93,10 @@ class BiMambaBlock(nn.Module):
         residual = x
         h = self.norm(x)
         fwd = self.fwd_mixer(h)
-
+        bwd_in = h.flip(dims=[1])
         if attention_mask is not None:
-            # Padding-safe reverse: keeps padding at the tail of what the
-            # backward mixer sees, instead of letting it leak in as fake
-            # "leading" context (see module docstring). Self-inverse, so
-            # the same helper both builds the input and undoes the
-            # reorder on the output.
-            bwd_in = _flip_valid(h, attention_mask)
-            bwd = _flip_valid(self.bwd_mixer(bwd_in), attention_mask)
-        else:
-            bwd_in = h.flip(dims=[1])
-            bwd = self.bwd_mixer(bwd_in).flip(dims=[1])
-
+            bwd_in = bwd_in * attention_mask.flip(dims=[1]).unsqueeze(-1)
+        bwd = self.bwd_mixer(bwd_in).flip(dims=[1])
         merged = self.merge(torch.cat([fwd, bwd], dim=-1))
         x = residual + self.dropout(merged)
         x = x + self.dropout(self.ffn(self.ffn_norm(x)))

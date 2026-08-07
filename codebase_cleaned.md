@@ -61,7 +61,6 @@ model:
   dropout: 0.1
   pad_token_id: 0
   gradient_checkpointing: true
-
 training:
   batch_size: 8
   grad_accum_steps: 8
@@ -70,28 +69,24 @@ training:
   warmup_steps: 10000
   max_steps: 200000
   mlm_probability: 0.15
-  fp16: true                    # Turing (2080Ti) has no real bf16 support, use fp16
+  fp16: true
   seed: 42
   save_steps: 5000
   log_steps: 100
   num_workers: 8
-
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"  # vocab_size=64000, taken from tokenizer at runtime
   train_dir: "outputs/data/train"   # dir of shard_*.txt, produced by prepare_data.py
   val_dir: "outputs/data/val"
   max_seq_length: 512
-
 paths:
   output_dir: "outputs"
   checkpoint_dir: "checkpoint"
   logs_dir: "logs"
   results_dir: "results"
-
 distributed:
   num_gpus: 4
   backend: "nccl"
-
 ```
 
 
@@ -108,7 +103,6 @@ model:
   dropout: 0.1
   pad_token_id: 0
   gradient_checkpointing: false
-
 training:
   batch_size: 2
   grad_accum_steps: 1
@@ -122,22 +116,18 @@ training:
   save_steps: 10
   log_steps: 1
   num_workers: 2
-
 distributed:
   num_gpus: 1
-
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
   train_dir: "outputs/data/train"
   val_dir: "outputs/data/val"
   max_seq_length: 512
-
 paths:
   output_dir: "outputs"
   checkpoint_dir: "checkpoint"
   logs_dir: "logs"
   results_dir: "results"
-
 ```
 
 
@@ -153,51 +143,41 @@ model:
   max_position_embeddings: 512
   dropout: 0.1
   pad_token_id: 0
-  gradient_checkpointing: true   # same as base: required to fit on 11GB cards
-
+  gradient_checkpointing: true
 training:
-  batch_size: 8                 # same as base: real VRAM/throughput behavior
+  batch_size: 8
   grad_accum_steps: 8
   lr: 3.0e-4
   weight_decay: 0.01
   warmup_steps: 10000
-  max_steps: 60                 # just enough to cross save_steps a couple times
+  max_steps: 60
   mlm_probability: 0.15
   fp16: true
   seed: 42
-  save_steps: 10                # hits the eval/checkpoint branch at step 10, 20, 30
+  save_steps: 10
   log_steps: 1
   num_workers: 8
-
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
   train_dir: "outputs/data/train"   # point at a real (even if small) shard dir
   val_dir: "outputs/data/val"
   max_seq_length: 512
-
 paths:
   output_dir: "outputs_eval_check"
   checkpoint_dir: "checkpoint_eval_check"
   logs_dir: "logs_eval_check"
   results_dir: "results_eval_check"
-
 distributed:
   num_gpus: 4
   backend: "nccl"
-
 ```
 
 
 ## configs/finetune_anercorp.yaml
 
 ```yaml
-# ==============================================================================
-# Task & Model Settings
-# ==============================================================================
 task:
   name: "anercorp"
-# Run `make prefinetune-anercorp` first, then point this at its output --
-# see configs/prefinetune_anercorp.yaml. Falls back to the base MLM
 # checkpoint if you haven't run the prefinetune step yet.
 pretrained_ckpt: "results_finetune/prefinetune_anercorp/polyglot_ner_ar_best.pt"
 model:
@@ -209,38 +189,22 @@ model:
   max_position_embeddings: 512
   dropout: 0.1
   gradient_checkpointing: false
-# ==============================================================================
-# Fine-Tuning & Hyperparameters
-# ==============================================================================
 training:
-  # Batch size per GPU (4 * 4 = 16 effective batch size across 4 GPUs)
-  # Keeping effective batch size small adds needed noise to prevent dev memorization
   batch_size: 4
   eval_batch_size: 32
-  # Learning rate & Schedule
   lr: 2.0e-5
   weight_decay: 0.01
-  warmup_steps: 50       # NOTE: current finetune.py only reads warmup_steps
-                          # (not warmup_ratio/lr_scheduler_type) -- using an
-                          # explicit step count here so warmup actually applies.
+  warmup_steps: 50
   max_grad_norm: 1.0
-  # Duration & Precision
-  epochs: 5                   # Mamba converges by epoch 4-5 on ANERcorp
+  epochs: 5
   fp16: true
   seed: 42
   num_workers: 4
-# ==============================================================================
-# Data & Tokenizer Configuration
-# ==============================================================================
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
-  max_seq_length: 128         # Cuts out padding noise from isolated news sentences
-# ==============================================================================
-# Paths
-# ==============================================================================
+  max_seq_length: 128
 paths:
   output_dir: "results_finetune/anercorp"
-
 ```
 
 
@@ -275,7 +239,6 @@ training:
   seed: 1337
   warmup_steps: 50
   weight_decay: 0.01
-
 ```
 
 
@@ -310,7 +273,6 @@ training:
   seed: 2024
   warmup_steps: 50
   weight_decay: 0.01
-
 ```
 
 
@@ -345,7 +307,6 @@ training:
   seed: 42
   warmup_steps: 50
   weight_decay: 0.01
-
 ```
 
 
@@ -379,7 +340,6 @@ data:
   max_seq_length: 384
 paths:
   output_dir: "results_finetune/arcd"
-
 ```
 
 
@@ -413,7 +373,6 @@ training:
   seed: 1337
   warmup_steps: 50
   weight_decay: 0.01
-
 ```
 
 
@@ -447,7 +406,6 @@ training:
   seed: 2024
   warmup_steps: 50
   weight_decay: 0.01
-
 ```
 
 
@@ -481,7 +439,6 @@ training:
   seed: 42
   warmup_steps: 50
   weight_decay: 0.01
-
 ```
 
 
@@ -490,9 +447,7 @@ training:
 ```yaml
 task:
   name: "hard"        # sentiment, HARD hotel reviews, MSA-leaning but not pure MSA
-
 pretrained_ckpt: "checkpoint/latest.pt"   # your 200k-step base.yaml checkpoint
-
 model:
   d_model: 512
   n_layer: 12
@@ -501,25 +456,21 @@ model:
   expand: 2
   max_position_embeddings: 512
   dropout: 0.1
-  gradient_checkpointing: false   # not needed at this batch size/seq len
-
+  gradient_checkpointing: false
 training:
   batch_size: 16
   eval_batch_size: 32
-  lr: 2.0e-5           # standard finetune LR, much lower than pretraining lr
+  lr: 2.0e-5
   weight_decay: 0.01
   epochs: 4
   fp16: true
   seed: 42
   num_workers: 4
-
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
-  max_seq_length: 256   # reviews are short; 256 saves VRAM/time vs 512
-
+  max_seq_length: 256
 paths:
   output_dir: "results_finetune/hard"
-
 ```
 
 
@@ -552,7 +503,6 @@ training:
   num_workers: 4
   seed: 1337
   weight_decay: 0.01
-
 ```
 
 
@@ -585,7 +535,6 @@ training:
   num_workers: 4
   seed: 2024
   weight_decay: 0.01
-
 ```
 
 
@@ -618,7 +567,6 @@ training:
   num_workers: 4
   seed: 42
   weight_decay: 0.01
-
 ```
 
 
@@ -652,7 +600,6 @@ data:
   max_seq_length: 512
 paths:
   output_dir: "results_finetune/squad_plus_arcd50"
-
 ```
 
 
@@ -661,9 +608,7 @@ paths:
 ```yaml
 task:
   name: "xnli_ar"
-
 pretrained_ckpt: "checkpoint/latest.pt"
-
 model:
   d_model: 512
   n_layer: 12
@@ -673,24 +618,20 @@ model:
   max_position_embeddings: 512
   dropout: 0.1
   gradient_checkpointing: false
-
 training:
   batch_size: 16
   eval_batch_size: 32
   lr: 2.0e-5
   weight_decay: 0.01
-  epochs: 3            # XNLI train split is large (~390k), 3 epochs is plenty
+  epochs: 3
   fp16: true
   seed: 42
   num_workers: 4
-
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
-  max_seq_length: 128   # premise+hypothesis pairs are short
-
+  max_seq_length: 128
 paths:
   output_dir: "results_finetune/xnli_ar"
-
 ```
 
 
@@ -723,7 +664,6 @@ training:
   num_workers: 4
   seed: 1337
   weight_decay: 0.01
-
 ```
 
 
@@ -756,7 +696,6 @@ training:
   num_workers: 4
   seed: 2024
   weight_decay: 0.01
-
 ```
 
 
@@ -789,7 +728,6 @@ training:
   num_workers: 4
   seed: 42
   weight_decay: 0.01
-
 ```
 
 
@@ -805,56 +743,46 @@ model:
   max_position_embeddings: 512
   dropout: 0.1
   pad_token_id: 0
-  gradient_checkpointing: true   # Keep this on to test real VRAM limits
-
+  gradient_checkpointing: true
 training:
-  batch_size: 8              # This is what we will stress-test
+  batch_size: 8
   grad_accum_steps: 8
-  lr: 5.0e-4                    # Slightly aggressive for pilot tests
+  lr: 5.0e-4
   weight_decay: 0.01
-  warmup_steps: 200             # Short warmup for quick diagnostic
-  max_steps: 2000               # We only need 1,000 - 2,000 steps to check trajectory
+  warmup_steps: 200
+  max_steps: 2000
   mlm_probability: 0.15
   fp16: true
   seed: 42
   save_steps: 500
   log_steps: 10
   num_workers: 4
-
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
   train_dir: "outputs/data/train"  # Pointing to your 500MB dry-run directory
   val_dir: "outputs/data/val"
   max_seq_length: 512
-
 paths:
   output_dir: "outputs_pilot"
   checkpoint_dir: "checkpoint_pilot"
   logs_dir: "logs_pilot"
   results_dir: "results_pilot"
-
 distributed:
   num_gpus: 4
   backend: "nccl"
-
 ```
 
 
 ## configs/prefinetune_anercorp.yaml
 
 ```yaml
-# Prefinetune step for ANERcorp: finetune the pretrained encoder on
 # Polyglot-NER's Arabic config (silver Wikipedia NER, capped at 150k
-# sentences -- see _POLYGLOT_NER_MAX_SENTENCES in finetune_datasets.py)
-# BEFORE the small (~150K token) ANERcorp gold set. Point
 # finetune_anercorp.yaml's pretrained_ckpt at this run's output best.pt
 # once it's done:
 #   pretrained_ckpt: "results_finetune/prefinetune_anercorp/polyglot_ner_ar_best.pt"
-#
 # NOTE: Polyglot-NER's tagset (O/PER/LOC/ORG, not BIO-prefixed) differs
 # from ANERcorp's (BIO + MISC) -- that's fine, only the encoder weights
 # carry over (load_pretrained_encoder only pulls "encoder.*" keys), the
-# classifier head here gets discarded and a fresh one is built for
 # ANERcorp's own tagset.
 task:
   name: "polyglot_ner_ar"
@@ -873,26 +801,22 @@ training:
   eval_batch_size: 32
   lr: 3.0e-5
   weight_decay: 0.01
-  epochs: 2               # silver data is noisier per-example than gold ANERcorp;
-                          # more epochs risks overfitting to the silver-label noise
+  epochs: 2
   warmup_steps: 200
   fp16: true
   seed: 42
   num_workers: 4
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
-  max_seq_length: 128     # Wikipedia sentences, same length regime as ANERcorp itself
+  max_seq_length: 128
 paths:
   output_dir: "results_finetune/prefinetune_anercorp"
-
 ```
 
 
 ## configs/prefinetune_arcd.yaml
 
 ```yaml
-# Prefinetune step for ARCD: finetune the pretrained encoder on
-# Arabic-SQuAD (48k machine-translated QA pairs) BEFORE the small
 # (~700 train example) ARCD gold set. Point finetune_arcd.yaml's
 # pretrained_ckpt at this run's output best.pt once it's done:
 #   pretrained_ckpt: "results_finetune/prefinetune_arcd/arabic_squad_best.pt"
@@ -913,8 +837,7 @@ training:
   eval_batch_size: 32
   lr: 3.0e-5
   weight_decay: 0.01
-  epochs: 2               # 48k examples * 2 epochs is plenty of QA-head exposure;
-                          # this is a warm start, not the final fit
+  epochs: 2
   warmup_steps: 200
   fp16: true
   seed: 42
@@ -922,10 +845,8 @@ training:
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
   max_seq_length: 384     # SQuAD paragraphs are generally shorter than ARCD's
-                          # Wikipedia paragraphs; 384 saves VRAM/time vs 512
 paths:
   output_dir: "results_finetune/prefinetune_arcd"
-
 ```
 
 
@@ -959,67 +880,29 @@ data:
   max_seq_length: 384
 paths:
   output_dir: "results_finetune/prefinetune_arcd_v2"
-
 ```
 
 
 ## src/data/finetune_datasets.py
 
 ```py
-"""
-Dataset loading + preprocessing for the MSA benchmark suite described in
-docs/BENCHMARKING.md. Each load_* function returns (train_ds, dev_ds,
-test_ds) as torch.utils.data.Dataset objects of pre-tokenized tensors.
-
-These benchmark datasets (hundreds to tens-of-thousands of rows) are
-small enough to tokenize eagerly and hold in RAM, so unlike
-ShardedTextDataset in train.py, no shard/index-on-disk machinery is
-needed here -- that machinery exists in train.py specifically because the
-120GB pretraining corpus can't fit in RAM; these benchmarks can.
-
-PREFINETUNE NOTE: load_arabic_squad() and load_polyglot_ner_ar() are NOT
-benchmark tasks -- they're larger, noisier resources meant to be
-finetuned on BEFORE the small gold benchmark tasks (arcd, anercorp)
-respectively, to give the randomly-initialized task head more examples
-to learn the task shape from before the tiny gold set. See
-configs/prefinetune_arcd.yaml / configs/prefinetune_anercorp.yaml and
-the corresponding `make prefinetune-*` targets. Their output checkpoints
-are fed back in as `pretrained_ckpt` for the real arcd/anercorp configs --
-this works with zero changes to load_pretrained_encoder(), since it
-already filters for keys starting with "encoder." and discards
-everything else (the prefinetune task's own head), so a QA-prefinetuned
-or NER-prefinetuned checkpoint slots in exactly the same way an
-MLM-pretrained one does.
-"""
-
 import random
-
 import torch
 from datasets import load_dataset
 from torch.utils.data import Dataset
-
-# ---------------------------------------------------------------------------
-# Sequence classification (HARD, XNLI-ar)
-# ---------------------------------------------------------------------------
-
-
 class ClassificationDataset(Dataset):
     def __init__(self, texts, labels, tokenizer, max_len):
         self.encodings = tokenizer(
             texts, truncation=True, max_length=max_len, padding=False
         )["input_ids"]
         self.labels = labels
-
     def __len__(self):
         return len(self.labels)
-
     def __getitem__(self, i):
         return {
             "input_ids": torch.tensor(self.encodings[i], dtype=torch.long),
             "label": torch.tensor(self.labels[i], dtype=torch.long),
         }
-
-
 def collate_classification(batch, pad_id):
     max_len = max(x["input_ids"].size(0) for x in batch)
     input_ids = torch.full((len(batch), max_len), pad_id, dtype=torch.long)
@@ -1030,64 +913,36 @@ def collate_classification(batch, pad_id):
         input_ids[i, :L] = x["input_ids"]
         attn_mask[i, :L] = 1.0
     return input_ids, attn_mask, labels
-
-
 def _split_train_only(texts, labels, seed=42, train_frac=0.8, dev_frac=0.1):
-    """Some Arabic benchmark datasets (HARD in particular) ship as a
-    single unsplit 'train' set. Carve out a fixed, seeded dev/test split
-    so results are at least reproducible across your own runs -- NOT
-    directly comparable to a paper's number unless they document the same
-    split, which AraBERT does not for HARD's raw form (they use the
-    AlGhafa-style curated split; note this in your writeup)."""
     n = len(texts)
     idx = list(range(n))
     random.Random(seed).shuffle(idx)
     n_train = int(n * train_frac)
     n_dev = int(n * dev_frac)
-
     def subset(lo, hi):
         return [texts[i] for i in idx[lo:hi]], [labels[i] for i in idx[lo:hi]]
-
     return (
         subset(0, n_train),
         subset(n_train, n_train + n_dev),
         subset(n_train + n_dev, n),
     )
-
-
 def load_hard(tokenizer, max_len):
-    """HARD -- Arabic hotel reviews (Elnagar et al. 2018), ratings 1-5.
-
-    Binarized per the standard AraBERT/ARBERT recipe: drop neutral rating
-    3, map 1-2 -> negative(0), 4-5 -> positive(1).
-    """
     ds = load_dataset("Elnagara/hard")
-
     texts, labels = [], []
     for ex in ds["train"]:
-        # label is a ClassLabel index: 0->'1', 1->'2', 2->'3', 3->'4', 4->'5'
         label_idx = ex["label"]
-        if label_idx == 2:  # rating '3' = neutral, skip
+        if label_idx == 2:
             continue
         texts.append(ex["text"])
         labels.append(1 if label_idx > 2 else 0)
-
     (tr_t, tr_l), (dv_t, dv_l), (te_t, te_l) = _split_train_only(texts, labels)
     return (
         ClassificationDataset(tr_t, tr_l, tokenizer, max_len),
         ClassificationDataset(dv_t, dv_l, tokenizer, max_len),
         ClassificationDataset(te_t, te_l, tokenizer, max_len),
     )
-
-
 def load_xnli_ar(tokenizer, max_len):
-    """XNLI, Arabic config. 3-way NLI: entailment(0) / neutral(1) /
-    contradiction(2), matching the standard XNLI label convention.
-    Premise/hypothesis are packed as one sequence via tokenizer's
-    text-pair mode so [SEP] handling stays with the tokenizer, not
-    hand-rolled here."""
     ds = load_dataset("facebook/xnli", "ar")
-
     def build(split):
         premises = [str(p) for p in ds[split]["premise"]]
         hyps = [str(h) for h in ds[split]["hypothesis"]]
@@ -1099,31 +954,16 @@ def load_xnli_ar(tokenizer, max_len):
         cds.encodings = enc["input_ids"]
         cds.labels = labels
         return cds
-
     return build("train"), build("validation"), build("test")
-
-
-# ---------------------------------------------------------------------------
-# Token classification (ANERcorp)
-# ---------------------------------------------------------------------------
-
-
 class TokenClassificationDataset(Dataset):
-    """Aligns word-level BIO tags to subword tokens: the first subword of
-    a word keeps the original tag, subsequent subwords of the same word
-    get -100 (ignored in the loss) -- the standard wordpiece/NER alignment
-    recipe (same one used by HF's own token-classification examples)."""
-
     def __init__(self, word_lists, tag_lists, tokenizer, max_len, label2id):
         self.tokenizer = tokenizer
         self.max_len = max_len
         self.label2id = label2id
         self.word_lists = word_lists
         self.tag_lists = tag_lists
-
     def __len__(self):
         return len(self.word_lists)
-
     def __getitem__(self, i):
         words = self.word_lists[i]
         tags = self.tag_lists[i]
@@ -1149,8 +989,6 @@ class TokenClassificationDataset(Dataset):
             "input_ids": torch.tensor(enc["input_ids"], dtype=torch.long),
             "labels": torch.tensor(labels, dtype=torch.long),
         }
-
-
 def collate_ner(batch, pad_id):
     max_len = max(x["input_ids"].size(0) for x in batch)
     input_ids = torch.full((len(batch), max_len), pad_id, dtype=torch.long)
@@ -1162,28 +1000,8 @@ def collate_ner(batch, pad_id):
         attn_mask[i, :L] = 1.0
         labels[i, :L] = x["labels"]
     return input_ids, attn_mask, labels
-
-
 SENTENCE_END_TOKENS = {".", "؟", "!"}
-
-
 def _group_into_pseudo_sentences(words, tags, max_words=120):
-    """asas-ai/ANERCorp is a flat, one-row-per-word stream with NO
-    sentence/document boundary column -- confirmed directly:
-    `ds["train"].column_names == ["word", "tag"]`, nothing else. True
-    sentence boundaries are not recoverable from this mirror.
-
-    We approximate them by splitting after sentence-final punctuation
-    (".", "؟", "!") tagged "O" -- the standard heuristic for flattened
-    CoNLL-style Arabic corpora lacking metadata. This will occasionally
-    mis-split on abbreviations/decimals, but that's minor, evenly
-    distributed noise, not a systematic bias.
-
-    As a safety net for a long run with no sentence-final punctuation, we
-    also hard-split every `max_words` tokens -- same "don't let an
-    unbounded run through ungoverned" logic already used in
-    prepare_data.py's chunk_doc().
-    """
     sentences_words, sentences_tags = [], []
     cur_w, cur_t = [], []
     for w, t in zip(words, tags):
@@ -1198,64 +1016,30 @@ def _group_into_pseudo_sentences(words, tags, max_words=120):
         sentences_words.append(cur_w)
         sentences_tags.append(cur_t)
     return sentences_words, sentences_tags
-
-
 def load_anercorp(tokenizer, max_len):
-    """ANERcorp -- MSA newswire NER, standard CoNLL BIO tags (PER/LOC/ORG/MISC).
-
-    CONFIRMED schema (direct check, not guessed): `asas-ai/ANERCorp` is
-    flat, one row per word, columns exactly ["word", "tag"], only
-    train/test splits (no validation). See _group_into_pseudo_sentences
-    for how sentence-like chunks are reconstructed from this.
-
-    Dev is carved out of TRAIN's pseudo-sentences (seeded, fixed split),
-    not out of test -- test stays untouched so it's still a clean,
-    never-looked-at-during-development set.
-    """
     ds = load_dataset("asas-ai/ANERCorp")
-
     all_tags = sorted(set(ds["train"]["tag"]) | set(ds["test"]["tag"]))
     label2id = {t: i for i, t in enumerate(all_tags)}
-
     train_sw, train_st = _group_into_pseudo_sentences(
         ds["train"]["word"], ds["train"]["tag"]
     )
     test_sw, test_st = _group_into_pseudo_sentences(
         ds["test"]["word"], ds["test"]["tag"]
     )
-
     idx = list(range(len(train_sw)))
     random.Random(42).shuffle(idx)
     n_dev = max(1, int(0.1 * len(idx)))
     dev_idx = set(idx[:n_dev])
-
     tr_w = [train_sw[i] for i in idx if i not in dev_idx]
     tr_t = [train_st[i] for i in idx if i not in dev_idx]
     dv_w = [train_sw[i] for i in dev_idx]
     dv_t = [train_st[i] for i in dev_idx]
-
     train_ds = TokenClassificationDataset(tr_w, tr_t, tokenizer, max_len, label2id)
     dev_ds = TokenClassificationDataset(dv_w, dv_t, tokenizer, max_len, label2id)
     test_ds = TokenClassificationDataset(test_sw, test_st, tokenizer, max_len, label2id)
-
-    train_ds.label2id = label2id  # stashed for finetune.py to build the head + id2label
+    train_ds.label2id = label2id
     return train_ds, dev_ds, test_ds
-
-
-# ---------------------------------------------------------------------------
-# Extractive QA (ARCD)
-# ---------------------------------------------------------------------------
-
-
 class QADataset(Dataset):
-    """Simplified single-pass SQuAD-style preprocessing: no sliding-window
-    doc-stride, the [question] [SEP] [context] sequence is just truncated
-    to max_len. ARCD contexts are short paragraphs (not full articles) so
-    this loses very few answers in practice, but if you see
-    answer-not-found warnings above a few percent, that's the signal to
-    add a doc-stride windowing pass instead of silently accepting the
-    loss -- flagging this now rather than after the fact."""
-
     def __init__(self, examples, tokenizer, max_len):
         self.tokenizer = tokenizer
         self.max_len = max_len
@@ -1272,14 +1056,12 @@ class QADataset(Dataset):
                 f"[QADataset] dropped {n_dropped}/{len(examples)} examples whose "
                 "answer span fell outside the truncated context"
             )
-
     @staticmethod
     def _build_feature(ex, tokenizer, max_len):
         question = ex["question"]
         context = ex["context"]
         answer_text = ex["answers"]["text"][0]
         answer_start = ex["answers"]["answer_start"][0]
-
         enc = tokenizer(
             question,
             context,
@@ -1289,30 +1071,23 @@ class QADataset(Dataset):
         )
         offsets = enc.pop("offset_mapping")
         sequence_ids = enc.sequence_ids()
-
-        # find the context token span
         ctx_start_tok = sequence_ids.index(1)
         ctx_end_tok = len(sequence_ids) - 1 - sequence_ids[::-1].index(1)
-
         char_start = answer_start
         char_end = answer_start + len(answer_text)
-
         if not (
             offsets[ctx_start_tok][0] <= char_start
             and offsets[ctx_end_tok][1] >= char_end
         ):
-            return None  # answer got truncated out of the window
-
+            return None
         tok_start = ctx_start_tok
         while tok_start <= ctx_end_tok and offsets[tok_start][0] <= char_start:
             tok_start += 1
         tok_start -= 1
-
         tok_end = ctx_end_tok
         while tok_end >= ctx_start_tok and offsets[tok_end][1] >= char_end:
             tok_end -= 1
         tok_end += 1
-
         return {
             "id": ex["id"],
             "input_ids": enc["input_ids"],
@@ -1320,10 +1095,8 @@ class QADataset(Dataset):
             "end": tok_end,
             "gold_answers": ex["answers"]["text"],
         }
-
     def __len__(self):
         return len(self.features)
-
     def __getitem__(self, i):
         f = self.features[i]
         return {
@@ -1333,8 +1106,6 @@ class QADataset(Dataset):
             "end": torch.tensor(f["end"], dtype=torch.long),
             "gold_answers": f["gold_answers"],
         }
-
-
 def collate_qa(batch, pad_id):
     max_len = max(x["input_ids"].size(0) for x in batch)
     input_ids = torch.full((len(batch), max_len), pad_id, dtype=torch.long)
@@ -1348,43 +1119,19 @@ def collate_qa(batch, pad_id):
         input_ids[i, :L] = x["input_ids"]
         attn_mask[i, :L] = 1.0
     return input_ids, attn_mask, starts, ends, ids, gold
-
-
 def load_arcd(tokenizer, max_len):
-    """ARCD -- 1,395 crowd-sourced QA pairs over Arabic Wikipedia
-    paragraphs. Ships with only train/validation; carve a fixed seeded
-    slice of validation into dev/test so you still have a held-out test
-    set that isn't the one you might tune stopping-epoch on."""
     ds = load_dataset("hsseinmz/arcd")
-
     train_ex = list(ds["train"])
     val_ex = list(ds["validation"])
     random.Random(42).shuffle(val_ex)
     half = len(val_ex) // 2
     dev_ex, test_ex = val_ex[:half], val_ex[half:]
-
     return (
         QADataset(train_ex, tokenizer, max_len),
         QADataset(dev_ex, tokenizer, max_len),
         QADataset(test_ex, tokenizer, max_len),
     )
-
-
-# ---------------------------------------------------------------------------
-# PREFINETUNE resources -- not benchmark tasks. Larger/noisier data meant
-# to warm up a task head before the small gold benchmark set (arcd,
-# anercorp). See module docstring.
-# ---------------------------------------------------------------------------
-
-
 def _flatten_squad_style(raw_data):
-    """Flattens nested SQuAD-JSON ('data' -> articles -> paragraphs ->
-    qas -> answers) into the flat example-dict schema QADataset already
-    expects: {"id", "question", "context", "answers": {"text": [...],
-    "answer_start": [...]}}. Arabic-SQuAD ships in this nested,
-    one-big-blob form (the original SQuAD release shape), unlike ARCD's
-    HF mirror which is already flat.
-    """
     examples = []
     for article in raw_data:
         for para in article["paragraphs"]:
@@ -1392,7 +1139,7 @@ def _flatten_squad_style(raw_data):
             for qa in para["qas"]:
                 answers = qa.get("answers") or []
                 if not answers:
-                    continue  # unanswerable / empty-answer rows, skip
+                    continue
                 examples.append(
                     {
                         "id": qa["id"],
@@ -1405,33 +1152,10 @@ def _flatten_squad_style(raw_data):
                     }
                 )
     return examples
-
-
 def load_arabic_squad(tokenizer, max_len):
-    """Arabic-SQuAD (Mozannar et al. 2019) -- machine translation of
-    English SQuAD v1.1, ~48,344 questions over ~10,364 paragraphs.
-
-    This is a PREFINETUNE resource for ARCD, not a benchmark task: ARCD's
-    ~700 train examples are too few to teach a randomly-initialized
-    span-extraction head from scratch, and this is the exact recipe used
-    by the ARCD paper's own SOQAL system (Arabic-SQuAD first, ARCD
-    second). See configs/prefinetune_arcd.yaml.
-
-    Ships as a single unsplit HF row containing the whole nested
-    'data' list (original SQuAD JSON shape) -- flattened via
-    _flatten_squad_style(), then a fixed seeded 90/5/5 split carves out
-    train/dev/test (same seeded-split spirit as _split_train_only, just
-    inlined here since the example schema differs from classification).
-
-    NOTE: machine-translated question/context pairs occasionally don't
-    align (translated answer span doesn't literally appear at the stated
-    offset in the translated context) -- QADataset already drops and
-    reports these, no separate handling needed here.
-    """
     ds = load_dataset("i0xs0/Arabic-SQuAD")
     raw_data = ds["train"][0]["data"]
     examples = _flatten_squad_style(raw_data)
-
     random.Random(42).shuffle(examples)
     n = len(examples)
     n_train = int(n * 0.90)
@@ -1439,108 +1163,58 @@ def load_arabic_squad(tokenizer, max_len):
     train_ex = examples[:n_train]
     dev_ex = examples[n_train : n_train + n_dev]
     test_ex = examples[n_train + n_dev :]
-
     return (
         QADataset(train_ex, tokenizer, max_len),
         QADataset(dev_ex, tokenizer, max_len),
         QADataset(test_ex, tokenizer, max_len),
     )
-
-
 def load_arcd_50_50(tokenizer, max_len, seed=42):
-    """ARCD 50/50 Split setup matching the benchmark standard (SOQAL / AraBERT).
-
-    Combines all available ARCD rows (train + validation), shuffles with a fixed seed,
-    and splits 50% into a train pool and 50% into a clean test set.
-    Carves out a small 10% validation set from the train pool for early stopping.
-    """
     ds = load_dataset("hsseinmz/arcd")
-
-    # Pool all ARCD examples together (693 train + 702 val = 1395 total)
     all_ex = list(ds["train"]) + list(ds["validation"])
     random.Random(seed).shuffle(all_ex)
-
     half = len(all_ex) // 2
-    arcd_train_pool = all_ex[:half]  # 50% for training
-    test_ex = all_ex[half:]  # 50% for testing
-
-    # Split train pool into 90% train / 10% dev
+    arcd_train_pool = all_ex[:half]
+    test_ex = all_ex[half:]
     n_dev = int(len(arcd_train_pool) * 0.10)
     dev_ex = arcd_train_pool[:n_dev]
     train_ex = arcd_train_pool[n_dev:]
-
     return (
         QADataset(train_ex, tokenizer, max_len),
         QADataset(dev_ex, tokenizer, max_len),
         QADataset(test_ex, tokenizer, max_len),
     )
-
-
 def load_squad_plus_arcd50(tokenizer, max_len, seed=42):
-    """Joint fine-tuning resource: Arabic-SQuAD + 50% of ARCD.
-
-    Combines Arabic-SQuAD and 50% of ARCD for training, while keeping a stable
-    ~2,070 example dev set for validation and holding out the remaining 50%
-    of ARCD strictly as test_ds.
-    """
-    # 1. Load Arabic-SQuAD and carve out a ~2,000 example dev set
     ds_squad = load_dataset("i0xs0/Arabic-SQuAD")
     raw_squad = ds_squad["train"][0]["data"]
     squad_examples = _flatten_squad_style(raw_squad)
-
     random.Random(seed).shuffle(squad_examples)
     n_squad_dev = 2000
     squad_train_ex = squad_examples[:-n_squad_dev]
     squad_dev_ex = squad_examples[-n_squad_dev:]
-
-    # 2. Get 50/50 ARCD splits
     ds_arcd = load_dataset("hsseinmz/arcd")
     all_arcd = list(ds_arcd["train"]) + list(ds_arcd["validation"])
     random.Random(seed).shuffle(all_arcd)
-
     half = len(all_arcd) // 2
-    arcd_train_pool = all_arcd[:half]  # 50% pool (~697 ex)
-    test_ex = all_arcd[half:]  # 50% strictly reserved test set (~698 ex)
-
-    # 3. Create ARCD train and dev splits from the training pool
+    arcd_train_pool = all_arcd[:half]
+    test_ex = all_arcd[half:]
     n_arcd_dev = int(len(arcd_train_pool) * 0.10)
     arcd_dev_ex = arcd_train_pool[:n_arcd_dev]
     arcd_train_ex = arcd_train_pool[n_arcd_dev:]
-
-    # 4. Combine splits for joint pre-finetuning
     joint_train_ex = squad_train_ex + arcd_train_ex
     joint_dev_ex = squad_dev_ex + arcd_dev_ex
-
     random.Random(seed).shuffle(joint_train_ex)
-
     print(
         f"[QA Loader] Joint setup: {len(joint_train_ex)} train "
         f"({len(squad_train_ex)} SQuAD + {len(arcd_train_ex)} ARCD) | "
         f"{len(joint_dev_ex)} dev | {len(test_ex)} test"
     )
-
     return (
         QADataset(joint_train_ex, tokenizer, max_len),
         QADataset(joint_dev_ex, tokenizer, max_len),
         QADataset(test_ex, tokenizer, max_len),
     )
-
-
 def load_tydiqa_ar(tokenizer, max_len):
-    """TyDi QA -- Gold Passage secondary task, Arabic subset. Human-written
-    questions over real Arabic Wikipedia passages (NOT machine-translated,
-    unlike Arabic-SQuAD) -- closer in domain/style to ARCD than translated
-    SQuAD is, so it's a useful complement in the prefinetune mix.
-
-    HF's secondary_task config bundles all languages with no language
-    column; filtering by the "id" prefix (e.g. "arabic-...") is the
-    standard workaround. VERIFY before trusting it, same spirit as
-    load_anercorp's direct schema check:
-        ds = load_dataset("google-research-datasets/tydiqa", "secondary_task")
-        print(ds["train"][0]["id"])
-    """
     ds = load_dataset("google-research-datasets/tydiqa", "secondary_task")
-
     def build(split):
         out = []
         for ex in ds[split]:
@@ -1558,29 +1232,20 @@ def load_tydiqa_ar(tokenizer, max_len):
                 },
             })
         return out
-
     train_ex = build("train")
     val_ex = build("validation")
     random.Random(42).shuffle(val_ex)
     half = len(val_ex) // 2
     dev_ex, test_ex = val_ex[:half], val_ex[half:]
-
     return (
         QADataset(train_ex, tokenizer, max_len),
         QADataset(dev_ex, tokenizer, max_len),
         QADataset(test_ex, tokenizer, max_len),
     )
-
-
 def load_squad_plus_tydiqa_ar(tokenizer, max_len, seed=42):
-    """Prefinetune resource: Arabic-SQuAD (large, translated) + TyDiQA-ar
-    (smaller, native, ARCD-like domain). Goal: reduce the translationese
-    gap between prefinetune and ARCD without dropping SQuAD's scale."""
     ds_squad = load_dataset("i0xs0/Arabic-SQuAD")
     squad_examples = _flatten_squad_style(ds_squad["train"][0]["data"])
-
     ds_tydi = load_dataset("google-research-datasets/tydiqa", "secondary_task")
-
     def tydi_build(split):
         return [
             {
@@ -1595,76 +1260,31 @@ def load_squad_plus_tydiqa_ar(tokenizer, max_len, seed=42):
             for ex in ds_tydi[split]
             if ex["id"].startswith("arabic") and ex["answers"]["text"]
         ]
-
     tydi_train = tydi_build("train")
     tydi_val = tydi_build("validation")
     random.Random(seed).shuffle(tydi_val)
     half = len(tydi_val) // 2
     tydi_dev, tydi_test = tydi_val[:half], tydi_val[half:]
-
     random.Random(seed).shuffle(squad_examples)
     n_squad_dev = 2000
     squad_train = squad_examples[:-n_squad_dev]
     squad_dev = squad_examples[-n_squad_dev:]
-
     train_ex = squad_train + tydi_train
     random.Random(seed).shuffle(train_ex)
     dev_ex = squad_dev + tydi_dev
-
     print(
         f"[QA Loader] squad+tydiqa_ar: {len(train_ex)} train "
         f"({len(squad_train)} squad + {len(tydi_train)} tydiqa) | "
         f"{len(dev_ex)} dev | {len(tydi_test)} test (tydiqa-ar only)"
     )
-
     return (
         QADataset(train_ex, tokenizer, max_len),
         QADataset(dev_ex, tokenizer, max_len),
         QADataset(tydi_test, tokenizer, max_len),
     )
-
-
-# Cap on how many Polyglot-NER sentences to actually train on. It's a
-# Wikipedia-scale silver corpus -- far bigger than a couple prefinetune
-# epochs need, and running the full thing just burns compute for very
-# little extra benefit at this stage. Raise this if you have the compute
-# budget and want to push prefinetune further.
 _POLYGLOT_NER_MAX_SENTENCES = 150_000
-
-
 def load_polyglot_ner_ar(tokenizer, max_len):
-    """Polyglot-NER (Al-Rfou et al. 2015), Arabic subset -- silver-standard
-    NER auto-generated from Wikipedia + Freebase hyperlinks. Tags are
-    {O, PER, LOC, ORG} (no MISC, and not BIO-prefixed -- Polyglot-NER's
-    own flat scheme, distinct from ANERcorp's BIO+MISC scheme).
-
-    NOTE: rmyeid/polyglot_ner is a legacy script-based HF dataset repo;
-    modern `datasets` (>=3.0) refuses to execute the loading script
-    ("Dataset scripts are no longer supported"). We load the Hub's
-    auto-converted Parquet mirror via revision="refs/convert/parquet",
-    which FLATTENED the original per-language BUILDER_CONFIGS into a
-    single "default" config spanning all 40 languages -- confirmed via
-    ValueError: BuilderConfig 'ar' not found. Available: ['default'].
-
-    Rather than materializing the full 8.48M-example combined split
-    (as a non-streaming .filter() would), we load with streaming=True:
-    datasets iterates shard-by-shard on the fly and .take(n) stops as
-    soon as n matching ("lang"=="ar") examples are found, so we never
-    build or hold the full multilingual split in memory, and may not
-    even need to touch all 50 remote shards depending on where Arabic
-    rows fall in shard order. This is the documented HF idiom for
-    "filter a huge dataset down to a small slice without downloading
-    the whole thing" (see datasets streaming docs).
-
-    Only PREFINETUNE_SAMPLE_SIZE examples are pulled: this step exists
-    to warm up a randomly-initialized task head on the shape of the NER
-    task before the small ANERcorp gold set, not to re-teach the
-    encoder Arabic (already pretrained from scratch on Wikipedia +
-    CulturaX), so a small silver sample is sufficient -- see
-    _POLYGLOT_NER_MAX_SENTENCES's docstring note elsewhere in this file.
-    """
-    PREFINETUNE_SAMPLE_SIZE = _POLYGLOT_NER_MAX_SENTENCES  # currently 20_000
-
+    PREFINETUNE_SAMPLE_SIZE = _POLYGLOT_NER_MAX_SENTENCES
     ds = load_dataset(
         "rmyeid/polyglot_ner",
         "default",
@@ -1672,36 +1292,28 @@ def load_polyglot_ner_ar(tokenizer, max_len):
         streaming=True,
     )
     ar_stream = ds["train"].filter(lambda ex: ex["lang"] == "ar")
-
     words_col, tags_col = [], []
     for ex in ar_stream.take(PREFINETUNE_SAMPLE_SIZE):
         words_col.append(ex["words"])
         tags_col.append(ex["ner"])
-
     idx = list(range(len(words_col)))
     random.Random(42).shuffle(idx)
-
     n = len(idx)
     n_train = int(n * 0.90)
     n_dev = int(n * 0.05)
     train_idx = idx[:n_train]
     dev_idx = idx[n_train : n_train + n_dev]
     test_idx = idx[n_train + n_dev :]
-
     all_tags = sorted({t for i in idx for t in tags_col[i]})
     label2id = {t: i for i, t in enumerate(all_tags)}
-
     def subset(indices):
         return [words_col[i] for i in indices], [tags_col[i] for i in indices]
-
     tr_w, tr_t = subset(train_idx)
     dv_w, dv_t = subset(dev_idx)
     te_w, te_t = subset(test_idx)
-
     train_ds = TokenClassificationDataset(tr_w, tr_t, tokenizer, max_len, label2id)
     dev_ds = TokenClassificationDataset(dv_w, dv_t, tokenizer, max_len, label2id)
     test_ds = TokenClassificationDataset(te_w, te_t, tokenizer, max_len, label2id)
-
     train_ds.label2id = label2id
     return train_ds, dev_ds, test_ds
 ```
@@ -1710,44 +1322,6 @@ def load_polyglot_ner_ar(tokenizer, max_len):
 ## src/data/prepare_data.py
 
 ```py
-"""
-Build a large, deduplicated Arabic pretraining corpus sized to fit the
-available disk, using two streamed sources (no full raw download needed):
-
-  - Arabic Wikipedia            -> clean, encyclopedic register
-  - CulturaX (ar)                -> already cleaned + fuzzy-deduplicated
-                                     mC4+OSCAR web corpus, ~158B tokens
-                                     available for Arabic, so we only need
-                                     to consume a slice of it.
-
-CulturaX one-time setup (required before running this script):
-  1. accept the terms at https://huggingface.co/datasets/uonlp/CulturaX
-  2. `huggingface-cli login` (paste an HF access token with read access)
-
-This script:
-  - cleans docs in parallel across CPU cores (regex cleaning, language
-    ratio filter, min-length filter)
-  - CHUNKS each cleaned document into ~max_chunk_words-sized pieces before
-    writing. Without this, one line == one whole document, and Wikipedia
-    articles / CulturaX web pages routinely run to 500-2000+ words. Since
-    the training-side tokenizer truncates each line to max_seq_length
-    tokens, un-chunked long documents (a) blow past the model's sequence
-    length so almost every batch is padded/truncated to the max -> much
-    higher, less predictable GPU memory use, and (b) silently throw away
-    everything past the first ~512 tokens of any long document, wasting
-    most of the cleaned/deduped text you paid to collect.
-  - exact-dedups via a bounded-memory Bloom filter (no extra dependency),
-    applied per-chunk so repeated boilerplate chunks across documents are
-    still caught
-  - writes to sharded files (<out_dir>/train/shard_00000.txt, ...) instead
-    of one giant file, so downstream code never has to load the full
-    corpus into RAM
-  - stops once --target_size_gb of cleaned text has been written
-
-Usage:
-  python src/data/prepare_data.py --target_size_gb 120 --workers 64
-"""
-
 import argparse
 import functools
 import hashlib
@@ -1755,29 +1329,16 @@ import math
 import os
 import re
 from multiprocessing import Pool
-
 from datasets import load_dataset
 from tqdm import tqdm
-
 ARABIC_DIACRITICS = re.compile(r"[\u0617-\u061A\u064B-\u0652\u0670\u06D6-\u06ED]")
 ARABIC_CHAR = re.compile(r"[\u0600-\u06FF]")
 URL_RE = re.compile(r"http\S+|www\.\S+")
 WS_RE = re.compile(r"\s+")
-
 MIN_WORDS = 20
 MIN_ARABIC_RATIO = 0.7
-SHARD_BYTES = 1 * 1024**3  # ~1GB per shard file
-
-# Word-based chunk size, not token-based: this script has no tokenizer
-# dependency, so we approximate. Arabic subword tokenizers (e.g. the
-# AraBERT vocab used downstream) commonly run close to ~1 token/word to
-# ~1.3 tokens/word depending on register, so 400 words keeps most chunks
-# comfortably under a 512-token max_seq_length after the tokenizer adds
-# [CLS]/[SEP] and does its own subword splitting. Adjust if your
-# tokenizer's token/word ratio differs meaningfully.
+SHARD_BYTES = 1 * 1024**3
 MAX_CHUNK_WORDS = 400
-
-
 def clean_doc(text):
     if not text:
         return None
@@ -1791,13 +1352,7 @@ def clean_doc(text):
     if len(ARABIC_CHAR.findall(text)) / max(1, len(text)) < MIN_ARABIC_RATIO:
         return None
     return text
-
-
 def chunk_doc(text, max_words=MAX_CHUNK_WORDS):
-    """Split a cleaned document into ~max_words-sized chunks so no single
-    training line silently exceeds the model's max_seq_length. Splits on
-    whitespace-delimited words (cheap, no tokenizer dependency here); the
-    last partial chunk is kept only if it still meets MIN_WORDS."""
     words = text.split()
     if len(words) <= max_words:
         yield text
@@ -1807,34 +1362,23 @@ def chunk_doc(text, max_words=MAX_CHUNK_WORDS):
         if len(chunk_words) < MIN_WORDS:
             continue
         yield " ".join(chunk_words)
-
-
 def clean_and_chunk(text, max_chunk_words=MAX_CHUNK_WORDS):
-    """Combines clean_doc + chunk_doc into one function so it can be
-    passed to Pool.imap_unordered as a single per-item worker call."""
     cleaned = clean_doc(text)
     if cleaned is None:
         return []
     return list(chunk_doc(cleaned, max_words=max_chunk_words))
-
-
 class BloomFilter:
-    """Dependency-free, bounded-memory exact-dedup filter."""
-
     def __init__(self, capacity=200_000_000, error_rate=0.001):
         self.size = int(-capacity * math.log(error_rate) / (math.log(2) ** 2))
         self.k = max(1, int((self.size / capacity) * math.log(2)))
         self.bits = bytearray(self.size // 8 + 1)
-
     def _positions(self, item):
         h = hashlib.blake2b(item.encode("utf-8"), digest_size=16).digest()
         h1 = int.from_bytes(h[:8], "little")
         h2 = int.from_bytes(h[8:], "little")
         for i in range(self.k):
             yield (h1 + i * h2) % self.size
-
     def add_check(self, item):
-        """Returns True if `item` was already seen (i.e. it's a duplicate)."""
         seen = True
         for idx in self._positions(item):
             byte, bit = idx // 8, idx % 8
@@ -1842,8 +1386,6 @@ class BloomFilter:
                 seen = False
                 self.bits[byte] |= 1 << bit
         return seen
-
-
 class ShardWriter:
     def __init__(self, out_dir, prefix):
         self.out_dir = out_dir
@@ -1853,11 +1395,9 @@ class ShardWriter:
         self.bytes_in_shard = 0
         self.total_bytes = 0
         self._open_new_shard()
-
     def _open_new_shard(self):
         path = os.path.join(self.out_dir, f"{self.prefix}_{self.shard_idx:05d}.txt")
         self.f = open(path, "w", encoding="utf-8")
-
     def write(self, text):
         line = text + "\n"
         b = len(line.encode("utf-8"))
@@ -1869,24 +1409,17 @@ class ShardWriter:
         self.f.write(line)
         self.bytes_in_shard += b
         self.total_bytes += b
-
     def close(self):
         self.f.close()
-
-
 def stream_source(name, config, text_field="text"):
     ds = load_dataset(name, config, split="train", streaming=True)
     for ex in ds:
         yield ex[text_field]
-
-
 def bounded(raw_iter, writer, budget_bytes):
     for item in raw_iter:
         if writer.total_bytes >= budget_bytes:
             return
         yield item
-
-
 def process_stream(
     raw_iter,
     train_writer,
@@ -1898,7 +1431,6 @@ def process_stream(
     val_every=200,
 ):
     n_kept, n_seen, n_docs = 0, 0, 0
-
     pbar = tqdm(
         total=budget_bytes,
         unit="B",
@@ -1909,7 +1441,6 @@ def process_stream(
     )
     pbar.update(train_writer.total_bytes)
     last_bytes = train_writer.total_bytes
-
     for chunks in pool.imap_unordered(worker_fn, raw_iter, chunksize=256):
         n_docs += 1
         for cleaned in chunks:
@@ -1918,13 +1449,11 @@ def process_stream(
                 continue
             n_kept += 1
             (val_writer if n_kept % val_every == 0 else train_writer).write(cleaned)
-
             current_bytes = train_writer.total_bytes
             bytes_added = current_bytes - last_bytes
             if bytes_added > 0:
                 pbar.update(bytes_added)
                 last_bytes = current_bytes
-
             if n_seen % 1000 == 0:
                 keep_ratio = (n_kept / n_seen) * 100
                 pbar.set_postfix(
@@ -1941,17 +1470,13 @@ def process_stream(
             break
     pbar.close()
     return n_kept, n_seen
-
-
 def main(args):
     bloom = BloomFilter(capacity=args.dedup_capacity)
     train_writer = ShardWriter(os.path.join(args.out_dir, "train"), "shard")
     val_writer = ShardWriter(os.path.join(args.out_dir, "val"), "shard")
     budget_bytes = int(args.target_size_gb * 1024**3)
     worker_fn = functools.partial(clean_and_chunk, max_chunk_words=args.max_chunk_words)
-
     with Pool(processes=args.workers) as pool:
-        print("== Arabic Wikipedia ==")
         process_stream(
             bounded(
                 stream_source("wikimedia/wikipedia", "20231101.ar"),
@@ -1965,7 +1490,6 @@ def main(args):
             budget_bytes,
             worker_fn,
         )
-
         if train_writer.total_bytes < budget_bytes:
             print(
                 "== CulturaX (ar) == (needs HF terms accepted + `huggingface-cli login`)"
@@ -1981,15 +1505,12 @@ def main(args):
                 budget_bytes,
                 worker_fn,
             )
-
     train_writer.close()
     val_writer.close()
     print(
         f"done. train ~{train_writer.total_bytes / 1024**3:.2f}GB, "
         f"val ~{val_writer.total_bytes / 1024**3:.2f}GB"
     )
-
-
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--out_dir", default="outputs/data")
@@ -2013,51 +1534,17 @@ if __name__ == "__main__":
         help="split documents into chunks of at most this many words before writing",
     )
     main(p.parse_args())
-
 ```
 
 
 ## src/finetune.py
 
 ```py
-"""
-Multi-GPU (DDP) finetuning + evaluation driver for the MSA benchmark
-suite (see docs/BENCHMARKING.md). Mirrors train.py's DDP setup so a
-single task -- HARD's ~105k rows in particular -- can use all 4 GPUs
-instead of just one.
-
-Launch two ways:
-  single GPU, no DDP:
-    python src/finetune.py --config configs/finetune_hard.yaml
-  multi GPU, DDP (what make benchmark-* now uses):
-    torchrun --nproc_per_node=4 src/finetune.py --config configs/finetune_hard.yaml
-
-Only rank 0 evaluates on dev/test and writes results/checkpoints -- the
-same "only rank 0 evaluates" pattern train.py already uses for its
-val_loader, since eval here is a no_grad forward pass with no
-backward/allreduce needed. This works safely with a DDP-wrapped model
-specifically because this encoder has no BatchNorm-style buffers to
-sync (LayerNorm only) -- if you ever add a buffer-holding layer, revisit
-this assumption.
-
-NOTE: with DDP, every rank independently calls load_dataset(...) for the
-benchmark data. That's redundant tokenization/download work across 4
-ranks, but harmless at this scale -- unlike the 120GB pretraining corpus
-(why ShardedTextDataset in train.py bothers with an on-disk index at all).
-
-PREFINETUNE: arabic_squad / polyglot_ner_ar are prefinetune resources,
-not benchmark tasks -- run them first (make prefinetune-arcd /
-prefinetune-anercorp) and point finetune_arcd.yaml / finetune_anercorp.yaml's
-pretrained_ckpt at the resulting best.pt, before running the real
-arcd/anercorp benchmark. See data/finetune_datasets.py's module docstring.
-"""
-
 import argparse
 import datetime
 import json
 import os
 import random
-
 import numpy as np
 import torch
 import torch.distributed as dist
@@ -2066,7 +1553,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 from tqdm import tqdm
 from transformers import AutoTokenizer
-
 from data.finetune_datasets import (
     collate_classification,
     collate_ner,
@@ -2092,44 +1578,29 @@ from utils.finetune_metrics import (
     qa_metrics,
     seqeval_ner_metrics,
 )
-
 TASK_REGISTRY = {
     "hard": {"loader": load_hard, "task_type": "classification", "num_labels": 2},
     "xnli_ar": {"loader": load_xnli_ar, "task_type": "classification", "num_labels": 3},
     "anercorp": {"loader": load_anercorp, "task_type": "ner"},
     "arcd": {"loader": load_arcd, "task_type": "qa"},
-
-    # 50/50 ARCD Benchmark strategy
     "arcd_50_50": {"loader": load_arcd_50_50, "task_type": "qa"},
-
-    # Joint Pre-finetuning (Arabic-SQuAD + 50% ARCD)
     "squad_plus_arcd50": {"loader": load_squad_plus_arcd50, "task_type": "qa"},
     "squad_plus_tydiqa_ar": {"loader": load_squad_plus_tydiqa_ar, "task_type": "qa"},
-
-    # Prefinetune-only resources
     "arabic_squad": {"loader": load_arabic_squad, "task_type": "qa"},
     "polyglot_ner_ar": {"loader": load_polyglot_ner_ar, "task_type": "ner"},
 }
-
-
 def is_distributed():
     return int(os.environ.get("WORLD_SIZE", "1")) > 1
-
-
 def setup_ddp():
     dist.init_process_group(backend="nccl", timeout=datetime.timedelta(minutes=30))
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
     return local_rank
-
-
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-
-
 def evaluate_classification(model, loader, device, fp16):
     model.eval()
     all_preds, all_labels = [], []
@@ -2142,8 +1613,6 @@ def evaluate_classification(model, loader, device, fp16):
             all_labels += labels.tolist()
     model.train()
     return classification_metrics(all_preds, all_labels)
-
-
 def evaluate_ner(model, loader, device, fp16, id2label):
     model.eval()
     pred_tags, gold_tags = [], []
@@ -2164,8 +1633,6 @@ def evaluate_ner(model, loader, device, fp16, id2label):
                 gold_tags.append(g_seq)
     model.train()
     return seqeval_ner_metrics(pred_tags, gold_tags)
-
-
 def evaluate_qa(model, loader, device, fp16, tokenizer, max_answer_length=30, n_best=20):
     model.eval()
     preds, golds = {}, {}
@@ -2179,7 +1646,6 @@ def evaluate_qa(model, loader, device, fp16, tokenizer, max_answer_length=30, n_
             e_logits_b = out["end_logits"].float().cpu()
             ids_b = input_ids.cpu()
             mask_b = attn_mask.cpu()
-
             for i, qid in enumerate(ids):
                 row = ids_b[i]
                 real_len = int(mask_b[i].sum().item())
@@ -2188,18 +1654,15 @@ def evaluate_qa(model, loader, device, fp16, tokenizer, max_answer_length=30, n_
                 if len(sep_pos) == 0:
                     preds[qid] = []
                     continue
-
                 ctx_start = sep_pos[0].item() + 1
-                ctx_end = real_len - 2  # exclude trailing [SEP]
+                ctx_end = real_len - 2
                 if ctx_end < ctx_start:
                     preds[qid] = []
                     continue
-
                 s_logits, e_logits = s_logits_b[i], e_logits_b[i]
                 k = min(n_best, ctx_end - ctx_start + 1)
                 start_top = (torch.topk(s_logits[ctx_start:ctx_end+1], k).indices + ctx_start).tolist()
                 end_top = (torch.topk(e_logits[ctx_start:ctx_end+1], k).indices + ctx_start).tolist()
-
                 best_score, best_span = float("-inf"), None
                 for s in start_top:
                     for e in end_top:
@@ -2208,12 +1671,9 @@ def evaluate_qa(model, loader, device, fp16, tokenizer, max_answer_length=30, n_
                         score = s_logits[s].item() + e_logits[e].item()
                         if score > best_score:
                             best_score, best_span = score, (s, e)
-
                 preds[qid] = row[best_span[0]:best_span[1]+1].tolist() if best_span else []
     model.train()
     return preds, golds
-
-
 def build_model(task_type, mcfg, num_labels=None):
     if task_type == "classification":
         return MambaForSequenceClassification(mcfg, num_labels=num_labels)
@@ -2222,14 +1682,11 @@ def build_model(task_type, mcfg, num_labels=None):
     if task_type == "qa":
         return MambaForQuestionAnswering(mcfg)
     raise ValueError(f"unknown task_type: {task_type}")
-
-
 def main(cfg_path):
     cfg = yaml.safe_load(open(cfg_path))
     task_name = cfg["task"]["name"]
     task_info = TASK_REGISTRY[task_name]
     task_type = task_info["task_type"]
-
     ddp = is_distributed()
     if ddp:
         local_rank = setup_ddp()
@@ -2241,14 +1698,11 @@ def main(cfg_path):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         is_main = True
         world_size = 1
-
     set_seed(cfg["training"].get("seed", 42))
-
     tokenizer = AutoTokenizer.from_pretrained(cfg["data"]["tokenizer_name"])
     assert tokenizer.is_fast, "finetune.py requires a fast tokenizer (word_ids/offsets)"
-
     if is_main:
-        print(f"loading dataset for task={task_name} (world_size={world_size}) ...")
+        pass
     train_ds, dev_ds, test_ds = task_info["loader"](
         tokenizer, cfg["data"]["max_seq_length"]
     )
@@ -2258,29 +1712,24 @@ def main(cfg_path):
         num_labels = len(label2id)
     else:
         num_labels = task_info.get("num_labels")
-
     mcfg = dict(cfg["model"])
     mcfg["vocab_size"] = tokenizer.vocab_size
     mcfg["pad_token_id"] = tokenizer.pad_token_id
     model = build_model(task_type, mcfg, num_labels=num_labels).to(device)
-
     if cfg.get("pretrained_ckpt"):
         load_pretrained_encoder(model.encoder, cfg["pretrained_ckpt"], device=device)
         if is_main:
-            print(f"loaded pretrained encoder from {cfg['pretrained_ckpt']}")
+            pass
     elif is_main:
         print(
             "WARNING: no pretrained_ckpt set in config -- training encoder from "
             "scratch, this defeats the point of the benchmark"
         )
-
-    # Wrap AFTER loading pretrained weights into the plain module.
     if ddp:
         model = DDP(model, device_ids=[local_rank])
         core_model = model.module
     else:
         core_model = model
-
     tcfg = cfg["training"]
     if task_type == "classification":
         collate = lambda b: collate_classification(b, tokenizer.pad_token_id)
@@ -2288,7 +1737,6 @@ def main(cfg_path):
         collate = lambda b: collate_ner(b, tokenizer.pad_token_id)
     else:
         collate = lambda b: collate_qa(b, tokenizer.pad_token_id)
-
     if ddp:
         train_sampler = DistributedSampler(
             train_ds, shuffle=True, seed=tcfg.get("seed", 42)
@@ -2309,9 +1757,6 @@ def main(cfg_path):
             num_workers=tcfg["num_workers"],
             collate_fn=collate,
         )
-
-    # dev/test: only rank 0 evaluates -- same reasoning as train.py's
-    # val_loader, so no DistributedSampler needed here.
     dev_loader = DataLoader(
         dev_ds,
         batch_size=tcfg["eval_batch_size"],
@@ -2326,7 +1771,6 @@ def main(cfg_path):
         num_workers=tcfg["num_workers"],
         collate_fn=collate,
     )
-
     optim = torch.optim.AdamW(
         model.parameters(), lr=tcfg["lr"], weight_decay=tcfg["weight_decay"]
     )
@@ -2338,20 +1782,16 @@ def main(cfg_path):
         lambda step: min(1.0, step / max(1, warmup_steps))
         * max(0.0, (total_steps - step) / max(1, total_steps - warmup_steps)),
     )
-
     if is_main:
         os.makedirs(cfg["paths"]["output_dir"], exist_ok=True)
         effective_batch_size = tcfg["batch_size"] * world_size
-        print(f"world_size={world_size}  effective_batch_size={effective_batch_size}")
         print(
             "NOTE: effective batch size scales with world_size (same convention "
             "as train.py) -- if you compare against a single-GPU run of the same "
             "config, the two aren't directly comparable without adjusting lr/epochs."
         )
-
     best_metric, best_state = -1.0, None
     primary_metric = {"classification": "macro_f1", "ner": "f1", "qa": "f1"}[task_type]
-
     model.train()
     for epoch in range(tcfg["epochs"]):
         if ddp:
@@ -2379,7 +1819,6 @@ def main(cfg_path):
                 starts, ends = starts.to(device), ends.to(device)
                 with torch.amp.autocast(device_type="cuda", enabled=tcfg["fp16"]):
                     out = model(input_ids, attn_mask, starts, ends)
-
             loss = out["loss"]
             scaler.scale(loss).backward()
             scaler.unscale_(optim)
@@ -2389,10 +1828,8 @@ def main(cfg_path):
             scheduler.step()
             if is_main:
                 pbar.set_postfix({"loss": f"{loss.item():.4f}"})
-
         if ddp:
-            dist.barrier()  # let all ranks finish the epoch before rank-0-only eval
-
+            dist.barrier()
         if is_main:
             if task_type == "classification":
                 metrics = evaluate_classification(
@@ -2409,8 +1846,6 @@ def main(cfg_path):
                     for qid, ids in preds.items()
                 }
                 metrics = qa_metrics(preds_text, golds)
-
-            print(f"[epoch {epoch + 1}] dev metrics: {metrics}")
             if metrics[primary_metric] > best_metric:
                 best_metric = metrics[primary_metric]
                 best_state = {
@@ -2419,10 +1854,8 @@ def main(cfg_path):
                 print(
                     f"  -> new best ({primary_metric}={best_metric:.4f}), checkpointing in memory"
                 )
-
         if ddp:
-            dist.barrier()  # rank 0's eval finishes before others start the next epoch
-
+            dist.barrier()
     if is_main:
         if best_state is not None:
             core_model.load_state_dict(best_state)
@@ -2441,12 +1874,10 @@ def main(cfg_path):
                 for qid, ids in preds.items()
             }
             test_metrics = qa_metrics(preds_text, golds)
-
         print(
             f"=== FINAL test metrics for {task_name} "
             f"(seed={tcfg.get('seed', 42)}): {test_metrics} ==="
         )
-
         result_path = os.path.join(
             cfg["paths"]["output_dir"], f"{task_name}_seed{tcfg.get('seed', 42)}.json"
         )
@@ -2463,60 +1894,32 @@ def main(cfg_path):
                 ensure_ascii=False,
                 indent=2,
             )
-        print(f"wrote {result_path}")
-
         if best_state is not None:
             ckpt_path = os.path.join(cfg["paths"]["output_dir"], f"{task_name}_best.pt")
             torch.save(best_state, ckpt_path)
-            print(f"wrote {ckpt_path}")
-
     if ddp:
         dist.barrier()
         dist.destroy_process_group()
-
-
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--config", required=True)
     args = p.parse_args()
     main(args.config)
-
 ```
 
 
 ## src/models/mamba-old.py
 
 ```py
-"""
-Bidirectional Mamba encoder for Arabic MLM pretraining (AraBERT-style task,
-Mamba/SSM backbone instead of Transformer attention).
-
-Mamba itself is causal. To get a BERT-like encoder we run a forward mixer
-and a mixer on the reversed sequence in every block, then merge -> full
-bidirectional context, still O(L) instead of O(L^2).
-
-Uses `mamba_ssm` CUDA kernels if importable (fast, needs mamba-ssm +
-causal-conv1d installed and building against your CUDA/torch version).
-Falls back to a slow pure-PyTorch scan otherwise so the code still runs
-if the CUDA kernels fail to build on your 2080Tis -- use the fallback only
-to sanity-check correctness, not for real training (it's ~10-50x slower).
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 try:
     from mamba_ssm import Mamba
-
     MAMBA_SSM_AVAILABLE = True
 except ImportError:
     MAMBA_SSM_AVAILABLE = False
-
-
 class NaiveSSM(nn.Module):
-    """Pure-PyTorch selective-scan fallback. Slow (python loop over L)."""
-
     def __init__(self, d_model, d_state=16, d_conv=4, expand=2):
         super().__init__()
         self.d_inner = expand * d_model
@@ -2536,7 +1939,6 @@ class NaiveSSM(nn.Module):
         )
         self.D = nn.Parameter(torch.ones(self.d_inner))
         self.out_proj = nn.Linear(self.d_inner, d_model)
-
     def forward(self, x):
         B, L, _ = x.shape
         x_in, z = self.in_proj(x).chunk(2, dim=-1)
@@ -2557,14 +1959,10 @@ class NaiveSSM(nn.Module):
         y = torch.stack(ys, dim=1) + x_conv * self.D
         y = y * F.silu(z)
         return self.out_proj(y)
-
-
 def _make_mixer(d_model, d_state, d_conv, expand):
     if MAMBA_SSM_AVAILABLE:
         return Mamba(d_model=d_model, d_state=d_state, d_conv=d_conv, expand=expand)
     return NaiveSSM(d_model, d_state, d_conv, expand)
-
-
 class BiMambaBlock(nn.Module):
     def __init__(self, d_model, d_state, d_conv, expand, dropout=0.1):
         super().__init__()
@@ -2577,7 +1975,6 @@ class BiMambaBlock(nn.Module):
         self.ffn = nn.Sequential(
             nn.Linear(d_model, 4 * d_model), nn.GELU(), nn.Linear(4 * d_model, d_model)
         )
-
     def forward(self, x, attention_mask=None):
         residual = x
         h = self.norm(x)
@@ -2589,12 +1986,9 @@ class BiMambaBlock(nn.Module):
         merged = self.merge(torch.cat([fwd, bwd], dim=-1))
         x = residual + self.dropout(merged)
         x = x + self.dropout(self.ffn(self.ffn_norm(x)))
-
         if attention_mask is not None:
             x = x * attention_mask.unsqueeze(-1)
         return x
-
-
 class MambaEncoder(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -2617,7 +2011,6 @@ class MambaEncoder(nn.Module):
         )
         self.final_norm = nn.LayerNorm(d_model)
         self.gradient_checkpointing = config.get("gradient_checkpointing", False)
-
     def forward(self, input_ids, attention_mask=None):
         B, L = input_ids.shape
         x = self.word_emb(input_ids)
@@ -2632,8 +2025,6 @@ class MambaEncoder(nn.Module):
             else:
                 x = layer(x, attention_mask)
         return self.final_norm(x)
-
-
 class MambaForMaskedLM(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -2643,17 +2034,10 @@ class MambaForMaskedLM(nn.Module):
             nn.Linear(d_model, d_model), nn.GELU(), nn.LayerNorm(d_model)
         )
         self.decoder = nn.Linear(d_model, config["vocab_size"], bias=True)
-        self.decoder.weight = self.encoder.word_emb.weight  # weight tying
+        self.decoder.weight = self.encoder.word_emb.weight
         self.apply(self._init_weights)
-
     @staticmethod
     def _init_weights(module):
-        """BERT-style init: small-std normal for Linear/Embedding weights,
-        zeroed biases, zeroed padding row. Left at PyTorch defaults (std=1
-        for nn.Embedding) this model starts with wildly overconfident,
-        miscalibrated logits over the 64k vocab, producing a much higher
-        initial MLM loss than the ~ln(vocab_size) expected from random
-        guessing, and unstable early training."""
         if isinstance(module, nn.Linear):
             nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
@@ -2663,7 +2047,6 @@ class MambaForMaskedLM(nn.Module):
             if module.padding_idx is not None:
                 with torch.no_grad():
                     module.weight[module.padding_idx].fill_(0)
-
     def forward(self, input_ids, attention_mask=None, labels=None):
         hidden = self.encoder(input_ids, attention_mask)
         logits = self.decoder(self.mlm_head(hidden))
@@ -2673,92 +2056,30 @@ class MambaForMaskedLM(nn.Module):
                 logits.view(-1, logits.size(-1)), labels.view(-1), ignore_index=-100
             )
         return {"loss": loss, "logits": logits, "hidden_states": hidden}
-
 ```
 
 
 ## src/models/mamba.py
 
 ```py
-"""
-Bidirectional Mamba encoder for Arabic MLM pretraining (AraBERT-style task,
-Mamba/SSM backbone instead of Transformer attention).
-
-Mamba itself is causal. To get a BERT-like encoder we run a forward mixer
-and a mixer on the reversed sequence in every block, then merge -> full
-bidirectional context, still O(L) instead of O(L^2).
-
-Uses `mamba_ssm` CUDA kernels if importable (fast, needs mamba-ssm +
-causal-conv1d installed and building against your CUDA/torch version).
-Falls back to a slow pure-PyTorch scan otherwise so the code still runs
-if the CUDA kernels fail to build on your 2080Tis -- use the fallback only
-to sanity-check correctness, not for real training (it's ~10-50x slower).
-
-PADDING NOTE (read before touching the flip logic below):
-Pretraining (train.py / ShardedTextDataset / prepare_data.py's chunk_doc())
-feeds fixed-length, unpadded chunks -- attention_mask is effectively all-1s
-or None the whole run. Finetuning (finetune.py) on variable-length
-sentence/QA data uses real right-padding. A naive `h.flip(dims=[1])` puts
-padding *first* in the sequence the backward mixer consumes; since the
-mixer's projections (x_proj/dt_proj) have biases, an all-zero padded input
-still produces a non-zero SSM state update, and that corrupted state then
-carries into every real token for the rest of the backward pass. This is
-invisible to mean-pooled classification (HARD) but devastating for
-per-token readouts (NER span tags, QA start/end logits) -- exactly the
-"HARD is great, ARCD/ANERcorp are bad" pattern this comment is here to
-explain.
-
-_flip_valid() reverses only the real tokens per example, leaving padding
-at the tail where it can't contaminate anything -- i.e. it reproduces
-exactly the unpadded-sequence shape the encoder was actually pretrained
-on. When attention_mask has no padding (all 1s), _flip_valid produces
-bit-identical output to plain .flip(dims=[1]), so this is a no-op for
-the pretraining path and does not change, invalidate, or require redoing
-any existing pretrained checkpoint. If you ever extend pretraining itself
-to use padded/variable-length batches, this is the code path that keeps
-that safe too -- don't revert it back to a plain .flip() without
-re-reading this note.
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 try:
     from mamba_ssm import Mamba
-
     MAMBA_SSM_AVAILABLE = True
 except ImportError:
     MAMBA_SSM_AVAILABLE = False
-
-
 def _flip_valid(x, attention_mask):
-    """Reverse only the real (non-pad) tokens per example, keeping
-    padding at the tail. Unlike a plain .flip(), this never puts padding
-    ahead of real content in the causal order the backward mixer sees --
-    matching what the encoder was actually pretrained on (unpadded
-    sequences). Self-inverse: applying it twice with the same
-    attention_mask restores the original order, so it's used both to
-    build the backward mixer's input and to undo the reorder on its
-    output.
-
-    When attention_mask is all-1s (no padding -- the pretraining case),
-    this is mathematically identical to x.flip(dims=[1]).
-    """
     B, L, D = x.shape
-    lengths = attention_mask.sum(dim=1).long()  # (B,)
+    lengths = attention_mask.sum(dim=1).long()
     idx = torch.arange(L, device=x.device).unsqueeze(0).expand(B, L).clone()
     for b in range(B):
         n = lengths[b].item()
         if n > 0:
             idx[b, :n] = torch.arange(n - 1, -1, -1, device=x.device)
-        # idx[b, n:] stays as-is -> padding positions stay in place
     return torch.gather(x, 1, idx.unsqueeze(-1).expand(-1, -1, D))
-
-
 class NaiveSSM(nn.Module):
-    """Pure-PyTorch selective-scan fallback. Slow (python loop over L)."""
-
     def __init__(self, d_model, d_state=16, d_conv=4, expand=2):
         super().__init__()
         self.d_inner = expand * d_model
@@ -2778,7 +2099,6 @@ class NaiveSSM(nn.Module):
         )
         self.D = nn.Parameter(torch.ones(self.d_inner))
         self.out_proj = nn.Linear(self.d_inner, d_model)
-
     def forward(self, x):
         B, L, _ = x.shape
         x_in, z = self.in_proj(x).chunk(2, dim=-1)
@@ -2799,14 +2119,10 @@ class NaiveSSM(nn.Module):
         y = torch.stack(ys, dim=1) + x_conv * self.D
         y = y * F.silu(z)
         return self.out_proj(y)
-
-
 def _make_mixer(d_model, d_state, d_conv, expand):
     if MAMBA_SSM_AVAILABLE:
         return Mamba(d_model=d_model, d_state=d_state, d_conv=d_conv, expand=expand)
     return NaiveSSM(d_model, d_state, d_conv, expand)
-
-
 class BiMambaBlock(nn.Module):
     def __init__(self, d_model, d_state, d_conv, expand, dropout=0.1):
         super().__init__()
@@ -2819,33 +2135,22 @@ class BiMambaBlock(nn.Module):
         self.ffn = nn.Sequential(
             nn.Linear(d_model, 4 * d_model), nn.GELU(), nn.Linear(4 * d_model, d_model)
         )
-
     def forward(self, x, attention_mask=None):
         residual = x
         h = self.norm(x)
         fwd = self.fwd_mixer(h)
-
         if attention_mask is not None:
-            # Padding-safe reverse: keeps padding at the tail of what the
-            # backward mixer sees, instead of letting it leak in as fake
-            # "leading" context (see module docstring). Self-inverse, so
-            # the same helper both builds the input and undoes the
-            # reorder on the output.
             bwd_in = _flip_valid(h, attention_mask)
             bwd = _flip_valid(self.bwd_mixer(bwd_in), attention_mask)
         else:
             bwd_in = h.flip(dims=[1])
             bwd = self.bwd_mixer(bwd_in).flip(dims=[1])
-
         merged = self.merge(torch.cat([fwd, bwd], dim=-1))
         x = residual + self.dropout(merged)
         x = x + self.dropout(self.ffn(self.ffn_norm(x)))
-
         if attention_mask is not None:
             x = x * attention_mask.unsqueeze(-1)
         return x
-
-
 class MambaEncoder(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -2868,7 +2173,6 @@ class MambaEncoder(nn.Module):
         )
         self.final_norm = nn.LayerNorm(d_model)
         self.gradient_checkpointing = config.get("gradient_checkpointing", False)
-
     def forward(self, input_ids, attention_mask=None):
         B, L = input_ids.shape
         x = self.word_emb(input_ids)
@@ -2883,8 +2187,6 @@ class MambaEncoder(nn.Module):
             else:
                 x = layer(x, attention_mask)
         return self.final_norm(x)
-
-
 class MambaForMaskedLM(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -2894,17 +2196,10 @@ class MambaForMaskedLM(nn.Module):
             nn.Linear(d_model, d_model), nn.GELU(), nn.LayerNorm(d_model)
         )
         self.decoder = nn.Linear(d_model, config["vocab_size"], bias=True)
-        self.decoder.weight = self.encoder.word_emb.weight  # weight tying
+        self.decoder.weight = self.encoder.word_emb.weight
         self.apply(self._init_weights)
-
     @staticmethod
     def _init_weights(module):
-        """BERT-style init: small-std normal for Linear/Embedding weights,
-        zeroed biases, zeroed padding row. Left at PyTorch defaults (std=1
-        for nn.Embedding) this model starts with wildly overconfident,
-        miscalibrated logits over the 64k vocab, producing a much higher
-        initial MLM loss than the ~ln(vocab_size) expected from random
-        guessing, and unstable early training."""
         if isinstance(module, nn.Linear):
             nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
@@ -2914,7 +2209,6 @@ class MambaForMaskedLM(nn.Module):
             if module.padding_idx is not None:
                 with torch.no_grad():
                     module.weight[module.padding_idx].fill_(0)
-
     def forward(self, input_ids, attention_mask=None, labels=None):
         hidden = self.encoder(input_ids, attention_mask)
         logits = self.decoder(self.mlm_head(hidden))
@@ -2924,38 +2218,17 @@ class MambaForMaskedLM(nn.Module):
                 logits.view(-1, logits.size(-1)), labels.view(-1), ignore_index=-100
             )
         return {"loss": loss, "logits": logits, "hidden_states": hidden}
-
 ```
 
 
 ## src/models/mamba_heads.py
 
 ```py
-"""
-Task heads for finetuning the pretrained Bi-Mamba encoder on the MSA
-benchmark suite (see docs/BENCHMARKING.md). Mirrors the split already used
-by MambaForMaskedLM in mamba.py: a shared MambaEncoder trunk + a thin,
-task-specific head on top, so the same pretrained checkpoint can be reused
-across sequence classification, token classification, and extractive QA
-without touching the encoder implementation itself.
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from .mamba import MambaEncoder, MambaForMaskedLM
-
-
 def load_pretrained_encoder(encoder, ckpt_path, device="cpu", strict=False):
-    """Loads encoder.* weights from a MambaForMaskedLM training checkpoint
-    (as saved by train.py: ckpt["model"] is model.module.state_dict()).
-    Drops mlm_head.*/decoder.* keys since those don't exist on task heads.
-    strict=False by default: the tied decoder + mlm_head are *expected* to
-    be absent here, that's not a real mismatch, but we still print
-    whatever comes back so a genuinely wrong checkpoint isn't silently
-    swallowed.
-    """
     ckpt = torch.load(ckpt_path, map_location=device)
     state_dict = ckpt["model"] if "model" in ckpt else ckpt
     encoder_state = {
@@ -2970,32 +2243,16 @@ def load_pretrained_encoder(encoder, ckpt_path, device="cpu", strict=False):
         )
     missing, unexpected = encoder.load_state_dict(encoder_state, strict=strict)
     if missing:
-        print(f"[load_pretrained_encoder] missing keys: {missing}")
+        pass
     if unexpected:
-        print(f"[load_pretrained_encoder] unexpected keys: {unexpected}")
+        pass
     return encoder
-
-
 def _mean_pool(hidden, attention_mask):
-    """Mean-pool over real (non-padding) positions. Preferred over a
-    CLS-token pool here: unlike BERT, this encoder was never pretrained
-    with a dedicated [CLS] aggregation objective (MLM only), so there's no
-    reason to expect position 0 to hold a good sentence summary. Mean
-    pooling over the bidirectional Mamba output is the safer default for
-    a from-scratch architecture."""
     mask = attention_mask.unsqueeze(-1).to(hidden.dtype)
     summed = (hidden * mask).sum(dim=1)
     counts = mask.sum(dim=1).clamp(min=1e-6)
     return summed / counts
-
-
 class MambaForSequenceClassification(nn.Module):
-    """Sentence(-pair) classification: sentiment (HARD), NLI (XNLI-ar),
-    topic/news classification (SANAD/ASND). For sentence-pair tasks,
-    concatenate premise + [SEP] + hypothesis before tokenizing -- the
-    tokenizer owns sequence packing here, same convention as the rest of
-    this codebase, the model itself stays pair-agnostic."""
-
     def __init__(self, config, num_labels, dropout=None):
         super().__init__()
         self.num_labels = num_labels
@@ -3006,7 +2263,6 @@ class MambaForSequenceClassification(nn.Module):
         )
         self.classifier = nn.Linear(d_model, num_labels)
         self.classifier.apply(MambaForMaskedLM._init_weights)
-
     def forward(self, input_ids, attention_mask=None, labels=None):
         hidden = self.encoder(input_ids, attention_mask)
         pooled = (
@@ -3019,14 +2275,7 @@ class MambaForSequenceClassification(nn.Module):
         if labels is not None:
             loss = F.cross_entropy(logits, labels)
         return {"loss": loss, "logits": logits}
-
-
 class MambaForTokenClassification(nn.Module):
-    """Token-level classification: NER (ANERcorp), POS tagging. labels use
-    -100 for positions to ignore (padding, and for wordpiece tokenizers,
-    non-first subword pieces of a word) -- same ignore_index convention as
-    the MLM head in mamba.py, kept consistent on purpose."""
-
     def __init__(self, config, num_labels, dropout=None):
         super().__init__()
         self.num_labels = num_labels
@@ -3037,7 +2286,6 @@ class MambaForTokenClassification(nn.Module):
         )
         self.classifier = nn.Linear(d_model, num_labels)
         self.classifier.apply(MambaForMaskedLM._init_weights)
-
     def forward(self, input_ids, attention_mask=None, labels=None):
         hidden = self.encoder(input_ids, attention_mask)
         logits = self.classifier(self.dropout(hidden))
@@ -3047,21 +2295,13 @@ class MambaForTokenClassification(nn.Module):
                 logits.view(-1, self.num_labels), labels.view(-1), ignore_index=-100
             )
         return {"loss": loss, "logits": logits}
-
-
 class MambaForQuestionAnswering(nn.Module):
-    """Extractive QA (ARCD): predicts start/end token indices of the
-    answer span within a packed [question] [SEP] [context] sequence. Two
-    independent linear heads on the shared encoder output -- same
-    span-prediction formulation used for BERT-on-SQuAD."""
-
     def __init__(self, config):
         super().__init__()
         self.encoder = MambaEncoder(config)
         d_model = config["d_model"]
         self.qa_outputs = nn.Linear(d_model, 2)
         self.qa_outputs.apply(MambaForMaskedLM._init_weights)
-
     def forward(
         self, input_ids, attention_mask=None, start_positions=None, end_positions=None
     ):
@@ -3070,7 +2310,6 @@ class MambaForQuestionAnswering(nn.Module):
         start_logits, end_logits = logits.split(1, dim=-1)
         start_logits = start_logits.squeeze(-1)
         end_logits = end_logits.squeeze(-1)
-
         loss = None
         if start_positions is not None and end_positions is not None:
             ignored_index = start_logits.size(1)
@@ -3083,9 +2322,7 @@ class MambaForQuestionAnswering(nn.Module):
                 end_logits, end_positions, ignore_index=ignored_index
             )
             loss = (start_loss + end_loss) / 2
-
         return {"loss": loss, "start_logits": start_logits, "end_logits": end_logits}
-
 ```
 
 
@@ -3093,9 +2330,7 @@ class MambaForQuestionAnswering(nn.Module):
 
 ```py
 import torch
-
 from models.mamba import MambaForMaskedLM
-
 torch.manual_seed(0)
 device = "cuda"
 config = {
@@ -3109,48 +2344,32 @@ config = {
     "dropout": 0.0,
 }
 model = MambaForMaskedLM(config).to(device).eval()
-
 B, L = 2, 20
 real_len = 10
 input_ids_a = torch.randint(1, 1000, (B, L), device=device)
 attn_mask = torch.zeros(B, L, device=device)
 attn_mask[:, :real_len] = 1
 input_ids_a[:, real_len:] = 0
-
 input_ids_b = input_ids_a.clone()
 input_ids_b[:, real_len:] = torch.randint(1, 1000, (B, L - real_len), device=device)
-
 with torch.no_grad():
     out_a = model(input_ids_a, attn_mask)["logits"]
     out_b = model(input_ids_b, attn_mask)["logits"]
-
 real_diff = (out_a[:, :real_len] - out_b[:, :real_len]).abs().max().item()
-print("max diff at REAL positions from changing padding content:", real_diff)
-
 ```
 
 
 ## src/train.py
 
 ```py
-"""
-DDP MLM pretraining for the Bi-Mamba Arabic encoder, tuned for 4x RTX 2080Ti.
-
-Launch:
-  torchrun --nproc_per_node=4 src/train.py --config configs/base.yaml
-"""
-
 import warnings
-
 warnings.filterwarnings("ignore", category=FutureWarning)
-
 import argparse
 import datetime
 import glob
 import os
 import pickle
 import time
-
 import torch
 import torch.distributed as dist
 import yaml
@@ -3158,16 +2377,9 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, Dataset, DistributedSampler
 from tqdm import tqdm
 from transformers import AutoTokenizer
-
 from models.mamba import MambaForMaskedLM
 from utils.eval import evaluate
-
-
 class ShardedTextDataset(Dataset):
-    """Reads lines from many shard_*.txt files without loading the corpus
-    into RAM. Builds a one-time (shard_id, byte_offset) index per line,
-    cached to `<shard_dir>/.index.pkl` so it's only built once."""
-
     def __init__(self, shard_dir, tokenizer, max_len):
         self.shard_files = sorted(glob.glob(os.path.join(shard_dir, "*.txt")))
         if not self.shard_files:
@@ -3176,13 +2388,11 @@ class ShardedTextDataset(Dataset):
         self.max_len = max_len
         self.index = self._build_or_load_index(shard_dir)
         self._fh_cache = {}
-
     def _build_or_load_index(self, shard_dir):
         idx_path = os.path.join(shard_dir, ".index.pkl")
         if os.path.exists(idx_path):
             with open(idx_path, "rb") as f:
                 return pickle.load(f)
-        print(f"building line index for {shard_dir} (one-time)...")
         index = []
         for shard_id, path in enumerate(self.shard_files):
             with open(path, "rb") as f:
@@ -3193,12 +2403,9 @@ class ShardedTextDataset(Dataset):
                     offset = f.tell()
         with open(idx_path, "wb") as f:
             pickle.dump(index, f)
-        print(f"indexed {len(index)} lines")
         return index
-
     def __len__(self):
         return len(self.index)
-
     def __getitem__(self, i):
         shard_id, offset = self.index[i]
         fh = self._fh_cache.get(shard_id)
@@ -3211,8 +2418,6 @@ class ShardedTextDataset(Dataset):
             line, add_special_tokens=True, truncation=True, max_length=self.max_len
         )
         return torch.tensor(ids, dtype=torch.long)
-
-
 def collate_mlm(batch, pad_id, mask_id, vocab_size, mlm_prob):
     max_len = max(x.size(0) for x in batch)
     input_ids = torch.full((len(batch), max_len), pad_id, dtype=torch.long)
@@ -3233,29 +2438,22 @@ def collate_mlm(batch, pad_id, mask_id, vocab_size, mlm_prob):
     random_tokens = torch.randint(0, vocab_size, labels.shape, dtype=torch.long)
     input_ids[random_mask] = random_tokens[random_mask]
     return input_ids, attn_mask, labels
-
-
 def setup_ddp():
     dist.init_process_group(backend="nccl", timeout=datetime.timedelta(minutes=30))
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
     return local_rank
-
-
 def main(cfg_path):
     cfg = yaml.safe_load(open(cfg_path))
     local_rank = setup_ddp()
     device = torch.device(f"cuda:{local_rank}")
     is_main = local_rank == 0
-
     tokenizer = AutoTokenizer.from_pretrained(cfg["data"]["tokenizer_name"])
-
     mcfg = dict(cfg["model"])
     mcfg["vocab_size"] = tokenizer.vocab_size
     mcfg["pad_token_id"] = tokenizer.pad_token_id
     model = MambaForMaskedLM(mcfg).to(device)
     model = DDP(model, device_ids=[local_rank])
-
     tcfg = cfg["training"]
     train_ds = ShardedTextDataset(
         cfg["data"]["train_dir"], tokenizer, cfg["data"]["max_seq_length"]
@@ -3274,9 +2472,6 @@ def main(cfg_path):
             tcfg["mlm_probability"],
         ),
     )
-
-    # Val set: only rank 0 evaluates (no_grad forward, no backward/allreduce
-    # needed), so no DistributedSampler required here.
     val_ds = ShardedTextDataset(
         cfg["data"]["val_dir"], tokenizer, cfg["data"]["max_seq_length"]
     )
@@ -3293,7 +2488,6 @@ def main(cfg_path):
             tcfg["mlm_probability"],
         ),
     )
-
     optim = torch.optim.AdamW(
         model.parameters(), lr=tcfg["lr"], weight_decay=tcfg["weight_decay"]
     )
@@ -3304,68 +2498,47 @@ def main(cfg_path):
         lambda step: min(1.0, step / max(1, tcfg["warmup_steps"]))
         * max(0.0, (total_steps - step) / max(1, total_steps - tcfg["warmup_steps"])),
     )
-
     ckpt_dir = cfg["paths"]["checkpoint_dir"]
     os.makedirs(ckpt_dir, exist_ok=True)
     step = 0
     opt_step = 0
     latest_path = f"{ckpt_dir}/latest.pt"
     if os.path.exists(latest_path):
-        # map_location: every rank loads onto its own GPU, not rank 0's
         ckpt = torch.load(latest_path, map_location=device)
         model.module.load_state_dict(ckpt["model"])
         optim.load_state_dict(ckpt["optim"])
         scaler.load_state_dict(ckpt["scaler"])
         scheduler.load_state_dict(ckpt["scheduler"])
         opt_step = ckpt["step"]
-
         if is_main:
-            print(f"resumed from {latest_path} at opt_step {opt_step}")
-
-    # --- Performance Metrics Initialization ---
+            pass
     world_size = dist.get_world_size()
     effective_batch_size = tcfg["batch_size"] * world_size * tcfg["grad_accum_steps"]
-
     if is_main:
-        print("=" * 70)
-        print(f"🚀 Launching Bi-Mamba MLM Pretraining")
-        print(f"   GPUs: {world_size}x RTX 2080Ti")
-        print(f"   Effective Batch Size: {effective_batch_size}")
-        print(f"   Total Target Steps: {total_steps}")
-        print("=" * 70)
-
-    # Trackers for execution speed, data-loading lag, and loss smoothing
+        pass
     start_time = time.time()
     step_start_time = time.time()
     data_start_time = time.time()
-
     avg_loss = 0.0
     avg_data_time = 0.0
     avg_step_time = 0.0
-
     model.train()
     while opt_step < total_steps:
         sampler.set_epoch(opt_step)
-
-        # Wrap loader in tqdm (GPU 0 only)
         pbar = tqdm(
             loader,
             desc=f"⚙️ Step {opt_step}/{total_steps}",
             disable=not is_main,
             dynamic_ncols=True,
         )
-
         for input_ids, attn_mask, labels in pbar:
-            # Measure how long GPU was waiting on the DataLoader
             data_time = time.time() - data_start_time
             avg_data_time = 0.9 * avg_data_time + 0.1 * data_time
-
             input_ids, attn_mask, labels = (
                 input_ids.to(device),
                 attn_mask.to(device),
                 labels.to(device),
             )
-
             with torch.amp.autocast(device_type="cuda", enabled=tcfg["fp16"]):
                 out = model(input_ids, attn_mask, labels)
                 loss = out["loss"] / tcfg["grad_accum_steps"]
@@ -3378,35 +2551,27 @@ def main(cfg_path):
                 scheduler.step()
                 optim.zero_grad()
                 opt_step += 1
-
-                # Compute running step time and throughput
                 step_time = time.time() - step_start_time
                 avg_step_time = 0.9 * avg_step_time + 0.1 * step_time
-
                 current_loss = out["loss"].item()
                 avg_loss = (
                     current_loss
                     if avg_loss == 0.0
                     else 0.9 * avg_loss + 0.1 * current_loss
                 )
-
                 tokens_processed = (
                     input_ids.numel() * world_size * tcfg["grad_accum_steps"]
                 )
                 throughput = tokens_processed / max(0.001, step_time)
-
-                # Update tqdm bar dynamically instead of printing a new line
                 if is_main and opt_step % tcfg["log_steps"] == 0:
                     curr_lr = scheduler.get_last_lr()[0]
                     max_vram_gb = torch.cuda.max_memory_allocated(device) / (1024**3)
-
                     steps_remaining = total_steps - opt_step
                     eta_seconds = avg_step_time * steps_remaining
                     eta_str = str(datetime.timedelta(seconds=int(eta_seconds)))
                     elapsed_str = str(
                         datetime.timedelta(seconds=int(time.time() - start_time))
                     )
-
                     pbar.set_description(f"⚙️ Step {opt_step}/{total_steps}")
                     pbar.set_postfix(
                         {
@@ -3419,7 +2584,6 @@ def main(cfg_path):
                         }
                     )
                     torch.cuda.reset_peak_memory_stats(device)
-
                 if opt_step % tcfg["save_steps"] == 0 and opt_step > 0:
                     metrics = evaluate(
                         model, val_loader, device, tcfg["fp16"], max_batches=300
@@ -3430,7 +2594,6 @@ def main(cfg_path):
                             f"val_acc={metrics['accuracy']:.4f} "
                             f"val_ppl={metrics['perplexity']:.2f}"
                         )
-
                         ckpt = {
                             "step": opt_step,
                             "model": model.module.state_dict(),
@@ -3448,56 +2611,32 @@ def main(cfg_path):
             data_start_time = time.time()
             if opt_step >= total_steps:
                 break
-
     dist.destroy_process_group()
-
-
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--config", default="configs/base.yaml")
     args = p.parse_args()
     main(args.config)
-
 ```
 
 
 ## src/utils/aggregate_results.py
 
 ```py
-"""
-Aggregates the per-seed result JSONs written by finetune.py
-(results_finetune/<task>/<task>_seed<seed>.json) into a mean +- std
-summary per task, printed as a markdown table ready to paste into the
-paper. Kept as a standalone script rather than folded into finetune.py
-since aggregation happens once you have several runs, not per-run.
-
-Usage:
-  python src/utils/aggregate_results.py --results_dir results_finetune
-"""
-
 import argparse
 import glob
 import json
 import os
 import statistics
 from collections import defaultdict
-
-
 def load_results(results_dir):
-    """Returns {task_name: [result_dict, ...]} across all seeds found."""
     by_task = defaultdict(list)
     for path in glob.glob(os.path.join(results_dir, "*", "*_seed*.json")):
         with open(path) as f:
             r = json.load(f)
         by_task[r["task"]].append(r)
     return by_task
-
-
 def summarize(results):
-    """results: list of {"test": {metric: value, ...}, "seed": int, ...}
-    Returns {metric: (mean, std, n)} across seeds. std is 0.0 (not NaN)
-    for n==1 so a single-seed run still prints cleanly -- but the table
-    caller should flag n==1 as "not yet a real variance estimate"."""
     metrics = defaultdict(list)
     for r in results:
         for k, v in r["test"].items():
@@ -3508,22 +2647,14 @@ def summarize(results):
         std = statistics.pstdev(vals) if len(vals) > 1 else 0.0
         summary[k] = (mean, std, len(vals))
     return summary
-
-
 def main(results_dir):
     by_task = load_results(results_dir)
     if not by_task:
-        print(f"no result JSONs found under {results_dir}/*/*_seed*.json")
         return
-
-    print("| Task | Metric | Mean | Std | N seeds |")
-    print("|---|---|---|---|---|")
     for task, results in sorted(by_task.items()):
         summary = summarize(results)
         for metric, (mean, std, n) in sorted(summary.items()):
             flag = "  (single run, not a variance estimate)" if n == 1 else ""
-            print(f"| {task} | {metric} | {mean:.4f} | {std:.4f} | {n}{flag} |")
-
     n_seeds = {task: len(r) for task, r in by_task.items()}
     under_powered = [t for t, n in n_seeds.items() if n < 3]
     if under_powered:
@@ -3531,47 +2662,24 @@ def main(results_dir):
             f"\nNote: {under_powered} have fewer than 3 seeds -- run "
             f"`make benchmark-seeds TASK=<name>` before reporting these as final."
         )
-
-
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--results_dir", default="results_finetune")
     args = p.parse_args()
     main(args.results_dir)
-
 ```
 
 
 ## src/utils/eval.py
 
 ```py
-"""
-Held-out evaluation for MLM pretraining: val loss, masked-token accuracy,
-and perplexity. Kept separate from train.py so the eval logic can be run,
-tested, or extended (e.g. later a downstream probe) independently of the
-training loop.
-"""
-
 import math
-
 import torch
-
-
 @torch.no_grad()
 def evaluate(model, val_loader, device, fp16, max_batches=None):
-    """Runs a full pass over val_loader and returns a dict of metrics:
-      - loss: mean MLM cross-entropy loss over all masked positions
-      - accuracy: top-1 accuracy of predictions at masked positions only
-      - perplexity: exp(loss), the standard MLM perplexity metric
-
-    Only meant to be called on the main rank (rank 0); this is a no_grad
-    forward pass with no backward/allreduce, so DDP doesn't need every
-    rank to participate.
-    """
     model.eval()
     total_loss, n_batches = 0.0, 0
     correct, total_masked = 0, 0
-
     for i, (input_ids, attn_mask, labels) in enumerate(val_loader):
         if max_batches is not None and i >= max_batches:
             break
@@ -3582,10 +2690,8 @@ def evaluate(model, val_loader, device, fp16, max_batches=None):
         )
         with torch.amp.autocast(device_type="cuda", enabled=fp16):
             out = model(input_ids, attn_mask, labels)
-
         total_loss += out["loss"].item()
         n_batches += 1
-
         masked_positions = labels != -100
         if masked_positions.any():
             preds = out["logits"].argmax(dim=-1)
@@ -3593,38 +2699,22 @@ def evaluate(model, val_loader, device, fp16, max_batches=None):
                 (preds[masked_positions] == labels[masked_positions]).sum().item()
             )
             total_masked += masked_positions.sum().item()
-
     model.train()
-
     mean_loss = total_loss / max(1, n_batches)
     accuracy = correct / max(1, total_masked)
-    # guard against overflow on a badly-diverged run
     perplexity = math.exp(mean_loss) if mean_loss < 20 else float("inf")
-
     return {"loss": mean_loss, "accuracy": accuracy, "perplexity": perplexity}
-
 ```
 
 
 ## src/utils/finetune_metrics.py
 
 ```py
-"""
-Metrics for the MSA benchmark suite. Kept separate from finetune.py, same
-philosophy as src/utils/eval.py being separate from train.py: metric logic
-that can be tested or reused independently of the training loop.
-"""
-
 import collections
 import re
 import string
-
 import numpy as np
-
-
 def classification_metrics(preds, labels):
-    """Accuracy + macro-F1, computed by hand (no sklearn dependency --
-    same dependency-free spirit as the BloomFilter in prepare_data.py)."""
     preds = np.array(preds)
     labels = np.array(labels)
     acc = (preds == labels).mean()
@@ -3639,22 +2729,9 @@ def classification_metrics(preds, labels):
         f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
         f1s.append(f1)
     return {"accuracy": float(acc), "macro_f1": float(np.mean(f1s))}
-
-
 def seqeval_ner_metrics(pred_tags, gold_tags):
-    """Entity-level precision/recall/F1 over BIO tag sequences -- the
-    metric actually reported in the ANERcorp/AraBERT/ARBERT literature,
-    NOT token-level accuracy (token accuracy is inflated by the dominant
-    'O' class and isn't comparable to published numbers).
-
-    Requires `seqeval` (pip install seqeval --break-system-packages).
-    Falls back to token accuracy with a loud warning if it's missing, so
-    this never silently reports a number that looks like the standard
-    metric but isn't.
-    """
     try:
         from seqeval.metrics import f1_score, precision_score, recall_score
-
         return {
             "precision": precision_score(gold_tags, pred_tags),
             "recall": recall_score(gold_tags, pred_tags),
@@ -3673,29 +2750,13 @@ def seqeval_ner_metrics(pred_tags, gold_tags):
             "Run: pip install seqeval --break-system-packages"
         )
         return {"token_accuracy": correct / max(1, total)}
-
-
 _AR_DIACRITICS = re.compile(r"[\u0617-\u061A\u064B-\u0652\u0670\u06D6-\u06ED]")
-
-
 def _normalize_arabic_answer(s):
-    """SQuAD-style normalization adapted for Arabic: strip diacritics,
-    punctuation, and collapse whitespace, so e.g. trailing punctuation or
-    an optional diacritic doesn't spuriously fail an exact match. Reuses
-    the same diacritics regex as prepare_data.py on purpose, for
-    consistency across the codebase."""
     s = _AR_DIACRITICS.sub("", s)
     s = "".join(ch for ch in s if ch not in string.punctuation and ch not in "،؛؟”“")
     s = re.sub(r"\s+", " ", s).strip()
     return s
-
-
 def qa_metrics(preds, golds):
-    """preds: {id: predicted_answer_text}
-    golds: {id: [gold_answer_text, ...]}   (ARCD/SQuAD allow multiple refs)
-    Returns SQuAD-style EM and token-overlap F1, averaged over examples,
-    taking the best-matching gold answer per example.
-    """
     em_total, f1_total = 0.0, 0.0
     for qid, gold_list in golds.items():
         pred = _normalize_arabic_answer(preds.get(qid, ""))
@@ -3717,7 +2778,6 @@ def qa_metrics(preds, golds):
         f1_total += best_f1
     n = max(1, len(golds))
     return {"exact_match": 100 * em_total / n, "f1": 100 * f1_total / n}
-
 ```
 
 
@@ -3725,10 +2785,6 @@ def qa_metrics(preds, golds):
 
 ```py
 from datasets import load_dataset
-
 ds = load_dataset("asas-ai/ANERCorp")
-print(ds["train"].column_names)
-print(ds["train"][:15])
-
 ```
 

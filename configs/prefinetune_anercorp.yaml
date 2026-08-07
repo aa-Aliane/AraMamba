@@ -1,0 +1,41 @@
+# Prefinetune step for ANERcorp: finetune the pretrained encoder on
+# Polyglot-NER's Arabic config (silver Wikipedia NER, capped at 150k
+# sentences -- see _POLYGLOT_NER_MAX_SENTENCES in finetune_datasets.py)
+# BEFORE the small (~150K token) ANERcorp gold set. Point
+# finetune_anercorp.yaml's pretrained_ckpt at this run's output best.pt
+# once it's done:
+#   pretrained_ckpt: "results_finetune/prefinetune_anercorp/polyglot_ner_ar_best.pt"
+#
+# NOTE: Polyglot-NER's tagset (O/PER/LOC/ORG, not BIO-prefixed) differs
+# from ANERcorp's (BIO + MISC) -- that's fine, only the encoder weights
+# carry over (load_pretrained_encoder only pulls "encoder.*" keys), the
+# classifier head here gets discarded and a fresh one is built for
+# ANERcorp's own tagset.
+task:
+  name: "polyglot_ner_ar"
+pretrained_ckpt: "checkpoint/latest.pt"
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  gradient_checkpointing: false
+training:
+  batch_size: 16
+  eval_batch_size: 32
+  lr: 3.0e-5
+  weight_decay: 0.01
+  epochs: 2               # silver data is noisier per-example than gold ANERcorp;
+                          # more epochs risks overfitting to the silver-label noise
+  warmup_steps: 200
+  fp16: true
+  seed: 42
+  num_workers: 4
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  max_seq_length: 128     # Wikipedia sentences, same length regime as ANERcorp itself
+paths:
+  output_dir: "results_finetune/prefinetune_anercorp"

@@ -3,9 +3,10 @@
 # ==============================================================================
 task:
   name: "anercorp"
-
-pretrained_ckpt: "checkpoint/latest.pt"
-
+# Run `make prefinetune-anercorp` first, then point this at its output --
+# see configs/prefinetune_anercorp.yaml. Falls back to the base MLM
+# checkpoint if you haven't run the prefinetune step yet.
+pretrained_ckpt: "results_finetune/prefinetune_anercorp/polyglot_ner_ar_best.pt"
 model:
   d_model: 512
   n_layer: 12
@@ -15,7 +16,6 @@ model:
   max_position_embeddings: 512
   dropout: 0.1
   gradient_checkpointing: false
-
 # ==============================================================================
 # Fine-Tuning & Hyperparameters
 # ==============================================================================
@@ -24,27 +24,24 @@ training:
   # Keeping effective batch size small adds needed noise to prevent dev memorization
   batch_size: 4
   eval_batch_size: 32
-
   # Learning rate & Schedule
   lr: 2.0e-5
   weight_decay: 0.01
-  warmup_ratio: 0.05
-  lr_scheduler_type: "cosine"
+  warmup_steps: 50       # NOTE: current finetune.py only reads warmup_steps
+                          # (not warmup_ratio/lr_scheduler_type) -- using an
+                          # explicit step count here so warmup actually applies.
   max_grad_norm: 1.0
-
   # Duration & Precision
-  epochs: 5                   # Mamba converges by epoch 4–5 on ANERcorp
+  epochs: 5                   # Mamba converges by epoch 4-5 on ANERcorp
   fp16: true
   seed: 42
   num_workers: 4
-
 # ==============================================================================
 # Data & Tokenizer Configuration
 # ==============================================================================
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
   max_seq_length: 128         # Cuts out padding noise from isolated news sentences
-
 # ==============================================================================
 # Paths
 # ==============================================================================

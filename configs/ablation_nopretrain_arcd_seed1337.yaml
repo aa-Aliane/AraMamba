@@ -1,0 +1,26 @@
+data:
+  max_seq_length: 384
+  tokenizer_name: aubmindlab/bert-base-arabertv02
+model:
+  d_conv: 4
+  d_model: 512
+  d_state: 16
+  dropout: 0.1
+  expand: 2
+  gradient_checkpointing: false
+  max_position_embeddings: 512
+  n_layer: 12
+paths:
+  output_dir: results_finetune/ablation_no_pretrain/arcd
+task:
+  name: arcd
+training:
+  batch_size: 8
+  epochs: 10
+  eval_batch_size: 16
+  fp16: true
+  lr: 3.0e-05
+  num_workers: 4
+  seed: 1337
+  warmup_steps: 50
+  weight_decay: 0.01

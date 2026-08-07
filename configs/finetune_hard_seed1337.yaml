@@ -1,0 +1,26 @@
+data:
+  max_seq_length: 256
+  tokenizer_name: aubmindlab/bert-base-arabertv02
+model:
+  d_conv: 4
+  d_model: 512
+  d_state: 16
+  dropout: 0.1
+  expand: 2
+  gradient_checkpointing: false
+  max_position_embeddings: 512
+  n_layer: 12
+paths:
+  output_dir: results_finetune/hard
+pretrained_ckpt: checkpoint/latest.pt
+task:
+  name: hard
+training:
+  batch_size: 16
+  epochs: 4
+  eval_batch_size: 32
+  fp16: true
+  lr: 2.0e-05
+  num_workers: 4
+  seed: 1337
+  weight_decay: 0.01

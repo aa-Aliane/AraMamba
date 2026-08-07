@@ -1,6 +1,6 @@
 task:
-  name: "arcd"
-pretrained_ckpt: "results_finetune/prefinetune_arcd_v2/squad_plus_tydiqa_ar_best.pt"
+  name: "squad_plus_arcd50"
+pretrained_ckpt: "checkpoint/latest.pt"
 model:
   d_model: 512
   n_layer: 12
@@ -15,13 +15,13 @@ training:
   eval_batch_size: 16
   lr: 3.0e-5
   weight_decay: 0.01
-  epochs: 10
-  warmup_steps: 50
+  epochs: 5
+  warmup_steps: 500
   fp16: true
   seed: 42
   num_workers: 4
 data:
   tokenizer_name: "aubmindlab/bert-base-arabertv02"
-  max_seq_length: 384
+  max_seq_length: 512
 paths:
-  output_dir: "results_finetune/arcd"
+  output_dir: "results_finetune/squad_plus_arcd50"

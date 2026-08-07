@@ -1,0 +1,34 @@
+# Prefinetune step for ARCD: finetune the pretrained encoder on
+# Arabic-SQuAD (48k machine-translated QA pairs) BEFORE the small
+# (~700 train example) ARCD gold set. Point finetune_arcd.yaml's
+# pretrained_ckpt at this run's output best.pt once it's done:
+#   pretrained_ckpt: "results_finetune/prefinetune_arcd/arabic_squad_best.pt"
+task:
+  name: "arabic_squad"
+pretrained_ckpt: "checkpoint/latest.pt"
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  gradient_checkpointing: false
+training:
+  batch_size: 16          # bigger corpus, less overfitting risk than ARCD's 8
+  eval_batch_size: 32
+  lr: 3.0e-5
+  weight_decay: 0.01
+  epochs: 2               # 48k examples * 2 epochs is plenty of QA-head exposure;
+                          # this is a warm start, not the final fit
+  warmup_steps: 200
+  fp16: true
+  seed: 42
+  num_workers: 4
+data:
+  tokenizer_name: "aubmindlab/bert-base-arabertv02"
+  max_seq_length: 384     # SQuAD paragraphs are generally shorter than ARCD's
+                          # Wikipedia paragraphs; 384 saves VRAM/time vs 512
+paths:
+  output_dir: "results_finetune/prefinetune_arcd"

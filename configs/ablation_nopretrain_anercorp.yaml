@@ -1,0 +1,27 @@
+task:
+  name: anercorp
+model:
+  d_model: 512
+  n_layer: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_position_embeddings: 512
+  dropout: 0.1
+  gradient_checkpointing: false
+training:
+  batch_size: 4
+  eval_batch_size: 32
+  lr: 2.0e-05
+  weight_decay: 0.01
+  warmup_steps: 50
+  max_grad_norm: 1.0
+  epochs: 5
+  fp16: true
+  seed: 42
+  num_workers: 4
+data:
+  tokenizer_name: aubmindlab/bert-base-arabertv02
+  max_seq_length: 128
+paths:
+  output_dir: results_finetune/ablation_no_pretrain/anercorp

@@ -22,6 +22,12 @@ NOTE: with DDP, every rank independently calls load_dataset(...) for the
 benchmark data. That's redundant tokenization/download work across 4
 ranks, but harmless at this scale -- unlike the 120GB pretraining corpus
 (why ShardedTextDataset in train.py bothers with an on-disk index at all).
+
+PREFINETUNE: arabic_squad / polyglot_ner_ar are prefinetune resources,
+not benchmark tasks -- run them first (make prefinetune-arcd /
+prefinetune-anercorp) and point finetune_arcd.yaml / finetune_anercorp.yaml's
+pretrained_ckpt at the resulting best.pt, before running the real
+arcd/anercorp benchmark. See data/finetune_datasets.py's module docstring.
 """
 
 import argparse
@@ -44,8 +50,13 @@ from data.finetune_datasets import (
     collate_ner,
     collate_qa,
     load_anercorp,
+    load_arabic_squad,
     load_arcd,
+    load_arcd_50_50,
     load_hard,
+    load_polyglot_ner_ar,
+    load_squad_plus_arcd50,
+    load_squad_plus_tydiqa_ar,
     load_xnli_ar,
 )
 from models.mamba_heads import (
@@ -65,6 +76,17 @@ TASK_REGISTRY = {
     "xnli_ar": {"loader": load_xnli_ar, "task_type": "classification", "num_labels": 3},
     "anercorp": {"loader": load_anercorp, "task_type": "ner"},
     "arcd": {"loader": load_arcd, "task_type": "qa"},
+
+    # 50/50 ARCD Benchmark strategy
+    "arcd_50_50": {"loader": load_arcd_50_50, "task_type": "qa"},
+
+    # Joint Pre-finetuning (Arabic-SQuAD + 50% ARCD)
+    "squad_plus_arcd50": {"loader": load_squad_plus_arcd50, "task_type": "qa"},
+    "squad_plus_tydiqa_ar": {"loader": load_squad_plus_tydiqa_ar, "task_type": "qa"},
+
+    # Prefinetune-only resources
+    "arabic_squad": {"loader": load_arabic_squad, "task_type": "qa"},
+    "polyglot_ner_ar": {"loader": load_polyglot_ner_ar, "task_type": "ner"},
 }
 
 
@@ -122,23 +144,50 @@ def evaluate_ner(model, loader, device, fp16, id2label):
     return seqeval_ner_metrics(pred_tags, gold_tags)
 
 
-def evaluate_qa(model, loader, device, fp16):
+def evaluate_qa(model, loader, device, fp16, tokenizer, max_answer_length=30, n_best=20):
     model.eval()
     preds, golds = {}, {}
+    sep_id = tokenizer.sep_token_id
     with torch.no_grad():
         for input_ids, attn_mask, starts, ends, ids, gold in loader:
             input_ids, attn_mask = input_ids.to(device), attn_mask.to(device)
             with torch.amp.autocast(device_type="cuda", enabled=fp16):
                 out = model(input_ids, attn_mask)
-            start_idx = out["start_logits"].argmax(-1).cpu().tolist()
-            end_idx = out["end_logits"].argmax(-1).cpu().tolist()
+            s_logits_b = out["start_logits"].float().cpu()
+            e_logits_b = out["end_logits"].float().cpu()
+            ids_b = input_ids.cpu()
+            mask_b = attn_mask.cpu()
+
             for i, qid in enumerate(ids):
-                s, e = start_idx[i], end_idx[i]
-                if e < s:
-                    e = s
-                span_ids = input_ids[i, s : e + 1].cpu().tolist()
-                preds[qid] = span_ids
+                row = ids_b[i]
+                real_len = int(mask_b[i].sum().item())
+                sep_pos = (row[:real_len] == sep_id).nonzero(as_tuple=True)[0]
                 golds[qid] = gold[i]
+                if len(sep_pos) == 0:
+                    preds[qid] = []
+                    continue
+
+                ctx_start = sep_pos[0].item() + 1
+                ctx_end = real_len - 2  # exclude trailing [SEP]
+                if ctx_end < ctx_start:
+                    preds[qid] = []
+                    continue
+
+                s_logits, e_logits = s_logits_b[i], e_logits_b[i]
+                k = min(n_best, ctx_end - ctx_start + 1)
+                start_top = (torch.topk(s_logits[ctx_start:ctx_end+1], k).indices + ctx_start).tolist()
+                end_top = (torch.topk(e_logits[ctx_start:ctx_end+1], k).indices + ctx_start).tolist()
+
+                best_score, best_span = float("-inf"), None
+                for s in start_top:
+                    for e in end_top:
+                        if e < s or (e - s + 1) > max_answer_length:
+                            continue
+                        score = s_logits[s].item() + e_logits[e].item()
+                        if score > best_score:
+                            best_score, best_span = score, (s, e)
+
+                preds[qid] = row[best_span[0]:best_span[1]+1].tolist() if best_span else []
     model.train()
     return preds, golds
 
@@ -332,7 +381,7 @@ def main(cfg_path):
                     model, dev_loader, device, tcfg["fp16"], id2label
                 )
             else:
-                preds, golds = evaluate_qa(model, dev_loader, device, tcfg["fp16"])
+                preds, golds = evaluate_qa(model, dev_loader, device, tcfg["fp16"], tokenizer)
                 preds_text = {
                     qid: tokenizer.decode(ids, skip_special_tokens=True)
                     for qid, ids in preds.items()
@@ -364,7 +413,7 @@ def main(cfg_path):
                 model, test_loader, device, tcfg["fp16"], id2label
             )
         else:
-            preds, golds = evaluate_qa(model, test_loader, device, tcfg["fp16"])
+            preds, golds = evaluate_qa(model, test_loader, device, tcfg["fp16"], tokenizer)
             preds_text = {
                 qid: tokenizer.decode(ids, skip_special_tokens=True)
                 for qid, ids in preds.items()
